@@ -63,7 +63,7 @@ Latest release: **v0.1.2**. macOS (Apple Silicon and Intel) is tested; the Windo
 - **Read-only:** the app only reads from the platforms; archive, rename, tag and delete change your local copy only.
 - **Local-first:** no telemetry; data stays on your device, in your user folder.
 
-More detail in [docs/architecture.md](docs/architecture.md).
+More detail: [where your data lives and how sync works](docs/data-and-sync.md), and [docs/architecture.md](docs/architecture.md).
 
 ## Build from source
 
