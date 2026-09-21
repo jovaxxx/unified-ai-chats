@@ -65,6 +65,39 @@ describe('inbox shell', () => {
     expect(opened).toEqual(['https://chatgpt.com/c/fx-chatgpt-0']);
   });
 
+  it('opens a chat scrolled to its last message, and follows the end until the reader scrolls', async () => {
+    // jsdom has no layout: give the reader a height so there is an end to scroll to.
+    const desc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get: () => 1234,
+    });
+    try {
+      const user = await renderApp();
+      await user.click(screen.getByRole('button', { name: /Shopify theme structure/ }));
+      const reader = await screen.findByRole('region', { name: 'Chat reader' });
+      const body = reader.querySelector('.reader-body') as HTMLElement;
+      await waitFor(() => expect(body.scrollTop).toBe(1234));
+
+      // The reader scrolls up by themselves: the view stops following the end.
+      body.scrollTop = 10;
+      fireEvent.wheel(body);
+      fireEvent.load(body);
+      expect(body.scrollTop).toBe(10);
+
+      // Opening another chat starts from its end again.
+      await user.click(
+        screen.getByRole('button', { name: /Liquid: looping over product variants/ }),
+      );
+      await waitFor(() =>
+        expect((document.querySelector('.reader-body') as HTMLElement).scrollTop).toBe(1234),
+      ); // a new reader is made for each chat
+    } finally {
+      if (desc) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', desc);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+    }
+  });
+
   it('searches full text and clears back to the whole list', async () => {
     const user = await renderApp();
     await user.type(screen.getByRole('searchbox', { name: 'Search all chats' }), 'béchamel');

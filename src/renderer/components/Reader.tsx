@@ -39,6 +39,19 @@ export function Reader({
   const [copied, setCopied] = useState(false);
   const [viewing, setViewing] = useState<{ mediaId: number; alt: string | null } | null>(null);
   const [copyError, setCopyError] = useState(false);
+  // Opening a chat lands on its last message. Images above it can grow after they load, so the view keeps
+  // following the end until the reader scrolls by themselves.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const followEnd = useRef(true);
+  const toEnd = () => {
+    const el = bodyRef.current;
+    if (el && followEnd.current) el.scrollTop = el.scrollHeight;
+  };
+  const chatId = chat?.id ?? null;
+  useEffect(() => {
+    followEnd.current = true;
+    toEnd();
+  }, [chatId]);
 
   useEffect(() => {
     if (renaming) renameRef.current?.select();
@@ -230,7 +243,15 @@ export function Reader({
         </div>
       </header>
 
-      <div className="reader-body">
+      <div
+        className="reader-body"
+        ref={bodyRef}
+        onLoadCapture={toEnd}
+        onWheel={() => (followEnd.current = false)}
+        onTouchMove={() => (followEnd.current = false)}
+        onKeyDown={() => (followEnd.current = false)}
+        onPointerDown={() => (followEnd.current = false)}
+      >
         <div className="summary">
           <div className="eyebrow">{t('reader.summary')}</div>
           <p className={chat.summary ? undefined : 'is-placeholder'}>
