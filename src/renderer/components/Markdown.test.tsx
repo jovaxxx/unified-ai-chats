@@ -2,7 +2,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { stripMarkdown } from '../../shared/text';
+import { cleanDirectives, stripMarkdown } from '../../shared/text';
 import { Markdown } from './Markdown';
 
 afterEach(cleanup);
@@ -105,5 +105,50 @@ describe('stripMarkdown (list previews)', () => {
 
   it('keeps snake_case and multiplication intact', () => {
     expect(stripMarkdown('use my_var_name and 2 * 3 * 4')).toBe('use my_var_name and 2 * 3 * 4');
+  });
+});
+
+describe('ChatGPT directive markers', () => {
+  const draft = [
+    'Here is a message you can send:',
+    '',
+    ':::writing{variant="chat_message" id="58314" title="Message"}',
+    'Hi Sam, thanks for the quick reply!',
+    ':::',
+    '',
+    'Anything else?',
+  ].join('\n');
+
+  it('removes the opening and closing markers and keeps what is inside', () => {
+    const clean = cleanDirectives(draft);
+    expect(clean).not.toMatch(/:::|writing|58314/);
+    expect(clean).toContain('Hi Sam, thanks for the quick reply!');
+    expect(clean).toContain('Here is a message you can send:');
+    expect(clean).toContain('Anything else?');
+  });
+
+  it('keeps an email subject as a bold first line, and handles several blocks and contextList', () => {
+    const text =
+      ':::writing{variant="email" id="1" subject="Order update"}\nDear Ana,\n:::\n\n:::contextList\n- source a\n:::\n';
+    const clean = cleanDirectives(text);
+    expect(clean).toContain('**Order update**');
+    expect(clean).toContain('Dear Ana,');
+    expect(clean).toContain('- source a');
+    expect(clean).not.toMatch(/:::/);
+  });
+
+  it('leaves ordinary text and code blocks alone', () => {
+    const plain = 'Ratio a:b and a line with ::: in the middle.';
+    expect(cleanDirectives(plain)).toBe(plain);
+    const code = '```\n:::writing{x="1"}\n:::\n```';
+    expect(cleanDirectives(code)).toBe(code);
+  });
+
+  it('shows no marker in the rendered message or in the list preview', () => {
+    render(<Markdown text={draft} onOpenLink={() => {}} />);
+    expect(screen.getByText(/Hi Sam, thanks for the quick reply!/)).toBeVisible();
+    expect(screen.queryByText(/:::/)).toBeNull();
+    expect(screen.queryByText(/writing\{/)).toBeNull();
+    expect(stripMarkdown(draft)).not.toMatch(/:::|writing/);
   });
 });

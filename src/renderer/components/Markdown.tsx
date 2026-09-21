@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { cleanDirectives } from '../../shared/text';
 
 /**
  * Renders an assistant message the way the platforms do (headings, lists, tables, code, links).
@@ -42,7 +43,7 @@ export function Markdown({
           ),
         }}
       >
-        {text}
+        {cleanDirectives(text)}
       </ReactMarkdown>
     </div>
   );
