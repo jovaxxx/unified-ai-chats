@@ -257,6 +257,7 @@ export function Reader({
           <p className={chat.summary ? undefined : 'is-placeholder'}>
             {chat.summary ?? t('reader.noSummary')}
           </p>
+          {!chat.summary && <p className="is-placeholder">{t('reader.proNote')}</p>}
           <div className="tags">
             {chat.tags.map((tag) => (
               <span className="tag" key={tag}>

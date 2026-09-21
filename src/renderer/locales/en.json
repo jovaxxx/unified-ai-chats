@@ -144,7 +144,8 @@
     "resumeHint": "Paste it into a terminal to continue this session in Claude Code.",
     "resumeFailed": "Could not copy to the clipboard.",
     "remotePending": "A change to this chat is being sent to {{platform}}.",
-    "remoteFailed": "A change to this chat could not be sent to {{platform}}. See Activity."
+    "remoteFailed": "A change to this chat could not be sent to {{platform}}. See Activity.",
+    "proNote": "Available in the PRO version."
   },
   "dates": {
     "today": "Today",

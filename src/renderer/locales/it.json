@@ -144,7 +144,8 @@
     "resumeHint": "Incollalo in un terminale per continuare questa sessione in Claude Code.",
     "resumeFailed": "Impossibile copiare negli appunti.",
     "remotePending": "Una modifica a questa chat sta per essere inviata a {{platform}}.",
-    "remoteFailed": "Una modifica a questa chat non è stata inviata a {{platform}}. Vedi Attività."
+    "remoteFailed": "Una modifica a questa chat non è stata inviata a {{platform}}. Vedi Attività.",
+    "proNote": "Disponibile per la versione PRO."
   },
   "dates": {
     "today": "Oggi",

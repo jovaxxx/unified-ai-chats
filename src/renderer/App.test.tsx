@@ -98,6 +98,27 @@ describe('inbox shell', () => {
     }
   });
 
+  it('a chat without a summary shows the placeholder box with the note about the PRO version', async () => {
+    const account = repo.filterOptions().accounts[0]!;
+    const now = new Date().toISOString();
+    repo.upsertConversation({
+      accountId: account.id,
+      remoteId: 'no-summary-chat',
+      remoteTitle: 'Zebra crossing chat',
+      createdAt: now,
+      remoteUpdatedAt: now,
+      messages: [{ role: 'user', createdAt: now, blocks: [{ type: 'text', text: 'Hello there' }] }],
+    });
+    const user = await renderApp();
+    await user.type(screen.getByRole('searchbox', { name: 'Search all chats' }), 'Zebra crossing');
+    await user.click(await screen.findByRole('button', { name: /Zebra crossing chat/ }));
+    const reader = await screen.findByRole('region', { name: 'Chat reader' });
+    expect(within(reader).getByText(/No summary yet/)).toBeVisible();
+    expect(within(reader).getByText('Available in the PRO version.')).toBeVisible();
+    // The tags part of the box works in this version.
+    expect(within(reader).getByRole('button', { name: '+ Add tag' })).toBeVisible();
+  });
+
   it('searches full text and clears back to the whole list', async () => {
     const user = await renderApp();
     await user.type(screen.getByRole('searchbox', { name: 'Search all chats' }), 'béchamel');
