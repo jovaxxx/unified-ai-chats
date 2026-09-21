@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ChatDetail, ContentBlock } from '../../shared/types';
-import { daysUntil } from '../format';
+import { daysUntil, formatRelative } from '../format';
 import { Icon } from './Icon';
 import { Lightbox, StoredImage } from './Lightbox';
 import { Markdown } from './Markdown';
@@ -48,6 +48,19 @@ export function Reader({
     if (el && followEnd.current) el.scrollTop = el.scrollHeight;
   };
   const chatId = chat?.id ?? null;
+  const [endOf, setEndOf] = useState<number | null>(null);
+  const onScroll = () => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120 && el.scrollTop > 400;
+    setEndOf(bottom ? chatId : null);
+  };
+  // "Updated 5 min ago" keeps counting while the chat stays open.
+  const [tick, setTick] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setTick(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => {
     followEnd.current = true;
     toEnd();
@@ -151,7 +164,10 @@ export function Reader({
           {chat.remoteTitle !== chat.title && (
             <>{t('reader.originalTitle', { title: chat.remoteTitle })} · </>
           )}
-          {t('reader.messages', { count: chat.messageCount })} · {range}
+          {t('reader.messages', { count: chat.messageCount })} · {range} ·{' '}
+          <span title={updated.toLocaleString(i18n.language)}>
+            {t('reader.updatedAgo', { when: formatRelative(chat.updatedAt, tick, i18n.language) })}
+          </span>
         </div>
         {copied && (
           <div className="notice notice--ok" role="status">
@@ -251,6 +267,7 @@ export function Reader({
         onTouchMove={() => (followEnd.current = false)}
         onKeyDown={() => (followEnd.current = false)}
         onPointerDown={() => (followEnd.current = false)}
+        onScroll={onScroll}
       >
         <div className="summary">
           <div className="eyebrow">{t('reader.summary')}</div>
@@ -334,6 +351,21 @@ export function Reader({
           ),
         )}
       </div>
+
+      {endOf !== null && endOf === chatId && (
+        <button
+          type="button"
+          className="to-top"
+          aria-label={t('reader.toTop')}
+          title={t('reader.toTop')}
+          onClick={() => {
+            followEnd.current = false;
+            bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          <Icon name="arrow-up" />
+        </button>
+      )}
 
       {viewing && (
         <Lightbox

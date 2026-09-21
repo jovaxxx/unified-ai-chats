@@ -953,6 +953,27 @@ h1 {
   line-height: 1.7;
   overflow: auto;
 }
+.reader {
+  position: relative;
+}
+.to-top {
+  position: absolute;
+  right: 28px;
+  bottom: 72px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+.to-top:hover {
+  border-color: var(--muted-2);
+}
 .reader-foot {
   border-top: 1px solid var(--border-soft);
   background: var(--panel);

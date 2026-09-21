@@ -30,6 +30,7 @@ const PATHS: Record<string, ReactNode> = {
   ),
   'chev-down': <path d="m6 9 6 6 6-6" />,
   'chev-right': <path d="m9 6 6 6-6 6" />,
+  'arrow-up': <path d="M12 19V5m-6 6 6-6 6 6" />,
   plus: <path d="M12 5v14M5 12h14" />,
   external: (
     <>

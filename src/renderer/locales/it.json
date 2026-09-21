@@ -112,6 +112,8 @@
     "refreshed_other": "{{count}} chat aggiornate"
   },
   "reader": {
+    "updatedAgo": "Aggiornata {{when}}",
+    "toTop": "Torna in cima",
     "label": "Lettura chat",
     "empty": "Seleziona una chat per leggerla.",
     "notFound": "Questa chat non esiste più.",
