@@ -113,6 +113,9 @@ export function ActivityView({ version, onChanged }: Props) {
           </div>
         )}
       </header>
+      <div className="info-box" role="note">
+        <strong>{t('activity.proNote')}</strong>
+      </div>
 
       {summary?.paused && (
         <div className="notice" role="status">

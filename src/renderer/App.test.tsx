@@ -1128,6 +1128,7 @@ describe('changes on the platform (rename, archive, delete)', { timeout: 30_000 
       }),
     );
     const activity = await screen.findByRole('main', { name: 'Activity' });
+    expect(within(activity).getByRole('note')).toHaveTextContent('Available in the PRO version.');
     const row = await within(activity).findByRole('listitem');
     expect(within(row).getByText('Rename')).toBeVisible();
     expect(within(row).getByText('Waiting')).toBeVisible();

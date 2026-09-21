@@ -363,7 +363,8 @@
       "done": "Done",
       "failed": "Failed",
       "cancelled": "Cancelled"
-    }
+    },
+    "proNote": "Available in the PRO version."
   },
   "sync": {
     "listing": "{{label}}: looking at what changed… {{count}} found",
