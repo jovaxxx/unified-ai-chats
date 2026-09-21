@@ -1,0 +1,55 @@
+# Packaging config. The name, id and icon live HERE (and in assets/icon), so they can be changed in one place.
+appId: com.jovaxxx.unifiedaichats
+productName: Unified AI Chats
+copyright: Copyright © jovaxxx (MIT License)
+
+directories:
+  buildResources: assets/icon # icon.png (1024x1024); electron-builder makes .icns / .ico from it
+  output: release
+
+files:
+  - out/**
+  - package.json
+  # Nothing else ships: no sources, tests, docs or captures.
+
+# The app only uses node:sqlite (bundled with Electron): there are no native modules to rebuild or unpack.
+asar: true
+
+# User data (database, image previews, settings) lives in Electron's userData folder, outside the install folder,
+# so upgrading keeps it. Uninstalling does not delete it.
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # The app is not signed or notarized by Apple. identity "-" gives it the ad-hoc signature that Apple Silicon
+  # needs to launch it (a bare unsigned bundle does not verify).
+  identity: '-'
+  hardenedRuntime: false
+  gatekeeperAssess: false
+
+dmg:
+  title: ${productName}
+  writeUpdateInfo: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+linux:
+  category: Office
+  target:
+    - AppImage
+    - deb
+  maintainer: jovaxxx
+  synopsis: An email client for your AI chats
+
+# No spaces: GitHub turns them into dots, which would break the names listed in SHA256SUMS.txt.
+artifactName: Unified-AI-Chats-${version}-${os}-${arch}.${ext}

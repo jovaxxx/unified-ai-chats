@@ -1,0 +1,76 @@
+name: Release
+
+# Runs when a version tag is pushed (for example v0.1.0). Builds the installers on macOS, Windows and Linux runners,
+# then attaches them and a SHA256SUMS.txt to a GitHub Release of this repository.
+# No secrets are used.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # Install scripts are not needed: electron-builder fetches the Electron build it packages by itself.
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx electron-builder --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            release/*.dmg
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Checksums
+        working-directory: installers
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes
+        run: |
+          cat > notes.md <<'NOTES'
+          Installers for **Unified AI Chats** (working name).
+
+          | Platform | File | Status |
+          |---|---|---|
+          | macOS (Apple Silicon and Intel) | `.dmg` | Tested by the owner on Apple Silicon. **Not signed or notarized**: macOS shows a warning the first time (see the README, "Install"). |
+          | Windows (x64) | `.exe` | **Untested.** Built by CI only. Not signed: Windows SmartScreen will warn. |
+          | Linux (x64) | `.AppImage`, `.deb` | **Untested.** Built by CI only. |
+
+          Check a download with the `SHA256SUMS.txt` file (see the README).
+          The app is early software and talks to undocumented web endpoints that can change without notice.
+          NOTES
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" installers/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --notes-file notes.md \
+            $(case "$TAG" in *-*) echo --prerelease ;; esac)

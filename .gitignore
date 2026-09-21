@@ -1,0 +1,40 @@
+# Secrets and personal data (never commit)
+.env*
+*.sqlite*
+data/
+exports/
+captures/
+*.har
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+*.tsbuildinfo
+coverage/
+
+# Build output
+dist/
+out/
+build/
+release/
+.vite/
+
+# Electron
+*.asar
+.electron-builder/
+
+# Tests
+playwright-report/
+test-results/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
