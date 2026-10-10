@@ -144,3 +144,38 @@ describe('chats deleted on the platform follow it into the Trash', () => {
     expect(s.repo.liveRemoteIds(s.accountId).map((c) => c.remoteId)).toEqual(['keep']);
   });
 });
+
+describe('a chat already stored is filed in the folder the platform says it belongs to', () => {
+  it('moves a stored, unchanged chat that is in no project into the folder; leaves one that is in a project', async () => {
+    const s = setup(['a', 'b']);
+    const project = s.repo.upsertProject(s.accountId, 'g-p-1', 'Client');
+    s.repo.upsertConversation({
+      accountId: s.accountId,
+      remoteId: 'b',
+      remoteTitle: 'B',
+      projectId: project,
+      createdAt: NOW,
+      remoteUpdatedAt: NOW,
+      messages: [{ role: 'user', createdAt: NOW, blocks: [{ type: 'text', text: 'hi' }] }],
+    });
+    const connector: Connector = {
+      ...platform({ present: ['a', 'b'] }).connector,
+      async *listConversations() {
+        for (const id of ['a', 'b'])
+          yield {
+            remoteId: id,
+            remoteUpdatedAt: NOW,
+            projectRemoteId: 'work',
+            projectName: 'WORK',
+          };
+      },
+    };
+    const stats = await run(s, connector, false);
+    expect(stats.listing).toMatchObject({ filedInFolder: 1 });
+    const side = s.repo.sidebar().platforms[0]!.accounts[0]!;
+    const work = side.projects.find((p) => p.work)!;
+    expect(work).toMatchObject({ name: 'WORK', count: 1 });
+    expect(s.repo.getChat(s.chat.get('a')!)!.projectName).toBe('WORK');
+    expect(s.repo.getChat(s.chat.get('b')!)!.projectName).toBe('Client'); // a chat in a project stays there
+  });
+});

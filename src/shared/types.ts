@@ -73,6 +73,8 @@ export interface SidebarProject {
   id: number;
   name: string;
   count: number;
+  /** The folder of work chats: shown beside the other folders of the profile, not among the projects. */
+  work?: true;
 }
 
 export interface SidebarAccount {

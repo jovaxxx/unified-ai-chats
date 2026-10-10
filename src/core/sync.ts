@@ -41,6 +41,7 @@ export async function syncAccount(
       : undefined;
   const run = repo.startSyncRun(ctx.accountId);
   const stats: SyncStats = { seen: 0, imported: 0, failed: 0, errors: [] };
+  let filed = 0;
 
   try {
     // The list is cheap; reading each chat is not. So list first, keep only what is new or changed, and read the
@@ -53,7 +54,22 @@ export async function syncAccount(
       // Deleted for good in this app: it still exists at the source, but must not come back.
       if (repo.isIgnored(ctx.accountId, summary.remoteId)) continue;
       // Already stored and unchanged: an interrupted run resumes here instead of starting over.
-      if (repo.isUpToDate(ctx.accountId, summary.remoteId, summary.remoteUpdatedAt)) continue;
+      if (repo.isUpToDate(ctx.accountId, summary.remoteId, summary.remoteUpdatedAt)) {
+        // Already here and unchanged, but the platform says it belongs in a folder it is not in yet.
+        if (
+          summary.projectRemoteId &&
+          summary.projectName &&
+          repo.fileInProject(
+            ctx.accountId,
+            summary.remoteId,
+            summary.projectRemoteId,
+            summary.projectName,
+          )
+        ) {
+          filed++;
+        }
+        continue;
+      }
       queued.push(summary);
     }
     queued.sort((a, b) => Date.parse(b.remoteUpdatedAt) - Date.parse(a.remoteUpdatedAt));
@@ -96,6 +112,7 @@ export async function syncAccount(
     onProgress?.({ phase: 'reading', done: queued.length, total: queued.length });
     const listing = connector.notes?.(ctx);
     if (listing && Object.keys(listing).length > 0) stats.listing = listing;
+    if (filed > 0) stats.listing = { ...stats.listing, filedInFolder: filed };
     const checkedKey = `removal_check:${ctx.accountId}`;
     const moreKey = `removal_check_more:${ctx.accountId}`;
     const lastCheck = Date.parse(repo.getSetting(checkedKey) ?? '');

@@ -394,7 +394,7 @@ export function Sidebar({
                         {t('nav.inbox')}
                         <span className="count">{a.inbox}</span>
                       </button>
-                      {a.projects.length > 0 && (
+                      {a.projects.some((pr) => !pr.work) && (
                         <>
                           <button
                             type="button"
@@ -413,24 +413,44 @@ export function Sidebar({
                             />
                             <Icon name="folder" size="sm" />
                             {t('nav.projects')}
-                            <span className="count">{a.projects.length}</span>
+                            <span className="count">
+                              {a.projects.filter((pr) => !pr.work).length}
+                            </span>
                           </button>
                           {!closedProjects.includes(a.id) &&
-                            a.projects.map((pr) => (
-                              <button
-                                key={pr.id}
-                                type="button"
-                                className={`tree-item tree-item--project${
-                                  listShown && filters.projectId === pr.id ? ' is-active' : ''
-                                }`}
-                                onClick={() => onNavigate(at({ projectId: pr.id }))}
-                              >
-                                {pr.name}
-                                <span className="count">{pr.count}</span>
-                              </button>
-                            ))}
+                            a.projects
+                              .filter((pr) => !pr.work)
+                              .map((pr) => (
+                                <button
+                                  key={pr.id}
+                                  type="button"
+                                  className={`tree-item tree-item--project${
+                                    listShown && filters.projectId === pr.id ? ' is-active' : ''
+                                  }`}
+                                  onClick={() => onNavigate(at({ projectId: pr.id }))}
+                                >
+                                  {pr.name}
+                                  <span className="count">{pr.count}</span>
+                                </button>
+                              ))}
                         </>
                       )}
+                      {a.projects
+                        .filter((pr) => pr.work)
+                        .map((pr) => (
+                          <button
+                            key={pr.id}
+                            type="button"
+                            className={`tree-item${
+                              listShown && filters.projectId === pr.id ? ' is-active' : ''
+                            }`}
+                            onClick={() => onNavigate(at({ projectId: pr.id }))}
+                          >
+                            <Icon name="brief" size="sm" />
+                            {t('nav.work')}
+                            <span className="count">{pr.count}</span>
+                          </button>
+                        ))}
                       {a.platform !== 'claude-code' && (
                         <button
                           type="button"

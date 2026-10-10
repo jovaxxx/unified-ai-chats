@@ -629,6 +629,15 @@ describe('ChatGPT connector', () => {
       expect(ids).toEqual(expect.arrayContaining([uuid(90), uuid(91), uuid(1), uuid(2), uuid(3)]));
       expect(new Set(ids).size).toBe(ids.length);
       expect(c.notes!(x)).toMatchObject({ work: 2 });
+      // Work chats are listed with their folder, so one that is stored already is filed in it too.
+      const listed: { remoteId: string; projectName?: string }[] = [];
+      for await (const sum of c.listConversations(x)) listed.push(sum);
+      expect(
+        listed
+          .filter((l) => l.projectName === 'WORK')
+          .map((l) => l.remoteId)
+          .sort(),
+      ).toEqual([uuid(90), uuid(91)].sort());
       // The ordinary list is asked as before; the work list carries the origin the site uses.
       expect(
         s.calls.some(

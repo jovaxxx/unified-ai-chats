@@ -68,6 +68,9 @@ export interface RemoteConversationSummary {
   remoteId: string;
   /** Last change time as the source reports it (ISO 8601). Used for incremental sync. */
   remoteUpdatedAt: string;
+  /** A folder the chat belongs to even if it was stored before (a chat already here is filed in it, unchanged). */
+  projectRemoteId?: string;
+  projectName?: string;
 }
 
 export interface RemoteMessage {

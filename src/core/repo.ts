@@ -357,6 +357,22 @@ export class Repo {
     return row.id;
   }
 
+  /** Files a chat that is already stored, and is in no project yet, into a project. True if it was moved. */
+  fileInProject(
+    accountId: number,
+    remoteId: string,
+    projectRemoteId: string,
+    name: string,
+  ): boolean {
+    const row = this.db
+      .prepare('SELECT id, project_id FROM conversations WHERE account_id = ? AND remote_id = ?')
+      .get(accountId, remoteId) as { id: number; project_id: number | null } | undefined;
+    if (!row || row.project_id !== null) return false;
+    const project = this.upsertProject(accountId, projectRemoteId, name);
+    this.db.prepare('UPDATE conversations SET project_id = ? WHERE id = ?').run(project, row.id);
+    return true;
+  }
+
   /** Inserts or updates a conversation and replaces its messages and search index entry. */
   upsertConversation(c: NewConversation): number {
     return inTransaction(this.db, () => {
@@ -755,7 +771,7 @@ export class Repo {
       .all() as Row[];
     const projects = this.db
       .prepare(
-        `SELECT p.id, p.account_id, p.name,
+        `SELECT p.id, p.account_id, p.name, (p.remote_id = 'work') AS is_work,
                 (SELECT COUNT(*) FROM conversations c
                   WHERE c.project_id = p.id AND c.state IN ('inbox','archived')) AS count
            FROM projects p ORDER BY p.name COLLATE NOCASE`,
@@ -789,7 +805,12 @@ export class Repo {
         canWrite: { rename: false, archive: false, delete: false },
         projects: projects
           .filter((p) => p.account_id === a.id)
-          .map((p) => ({ id: p.id as number, name: p.name as string, count: p.count as number })),
+          .map((p) => ({
+            id: p.id as number,
+            name: p.name as string,
+            count: p.count as number,
+            ...(p.is_work ? { work: true } : {}),
+          })),
       });
       byPlatform.set(platform, group);
     }

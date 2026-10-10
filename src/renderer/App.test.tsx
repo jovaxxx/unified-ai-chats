@@ -1342,6 +1342,43 @@ describe('changes on the platform (rename, archive, delete)', { timeout: 30_000 
 });
 
 describe('sidebar tree', () => {
+  it('shows WORK on the main level of the tree, beside Chats and Projects and not among the projects', async () => {
+    const account = repo.filterOptions().accounts.find((a) => a.platform === 'chatgpt')!;
+    const now = new Date().toISOString();
+    const project = repo.upsertProject(account.id, 'work', 'WORK');
+    repo.upsertConversation({
+      accountId: account.id,
+      remoteId: 'work-chat-1',
+      remoteTitle: 'A work chat',
+      projectId: project,
+      createdAt: now,
+      remoteUpdatedAt: now,
+      messages: [{ role: 'user', createdAt: now, blocks: [{ type: 'text', text: 'hello' }] }],
+    });
+    const user = userEvent.setup();
+    await renderApp();
+    await user.click(screen.getByRole('button', { name: `ChatGPT ${account.label}` }));
+    const items = await waitFor(() => {
+      const tree = screen
+        .getAllByRole('button')
+        .filter((b) => b.className.includes('tree-item'))
+        .map((b) => ({ text: b.textContent ?? '', cls: b.className }));
+      expect(tree.length).toBeGreaterThan(3);
+      return tree;
+    });
+    const work = items.find((i) => /^WORK\d+$/.test(i.text))!;
+    expect(work).toBeDefined();
+    expect(work.cls).not.toContain('tree-item--project'); // a folder of the main level, not one of the projects
+    // The projects folder does not count it, and the main chats do not hold it.
+    expect(
+      items
+        .filter((i) => i.cls.includes('tree-item--project'))
+        .some((i) => i.text.startsWith('WORK')),
+    ).toBe(false);
+    await user.click(screen.getByRole('button', { name: /^WORK\d+$/ }));
+    expect(await screen.findByRole('button', { name: /A work chat/ })).toBeVisible();
+  });
+
   it('lists Chats, Projects (with the projects under it), Media and, always last, the Archive; there is no search entry', async () => {
     const user = userEvent.setup();
     await renderApp();

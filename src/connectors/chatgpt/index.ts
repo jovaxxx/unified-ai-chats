@@ -144,7 +144,11 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
             if (seen.has(item.id)) continue;
             seen.add(item.id);
             notes.work = (notes.work ?? 0) + 1;
-            yield summary(item.id, item.update_time);
+            yield {
+              ...summary(item.id, item.update_time),
+              projectRemoteId: WORK_FOLDER_ID,
+              projectName: WORK_FOLDER_NAME,
+            };
           }
         }
       } catch (err) {

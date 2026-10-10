@@ -23,6 +23,7 @@
     "onePerPlatform": "Questa versione collega un account per piattaforma.",
     "version": "Versione {{version}}",
     "versionHint": "La versione di questa app. Controllala quando segnali un problema.",
+    "work": "WORK",
     "addAccount": "Aggiungi account",
     "addAccountSoon": "L'aggiunta di account arriva con il primo connettore di piattaforma",
     "localNote": "Dati salvati solo su questo dispositivo.",
