@@ -1342,6 +1342,32 @@ describe('changes on the platform (rename, archive, delete)', { timeout: 30_000 
 });
 
 describe('sidebar tree', () => {
+  it('reloads the sidebar when a change that was waiting to be sent has finished', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const real = window.api;
+      let waiting = 1;
+      let sidebarCalls = 0;
+      window.api = {
+        ...real,
+        queueSummary: async () => ({ ...(await real.queueSummary()), pending: waiting }),
+        sidebar: async () => {
+          sidebarCalls++;
+          return real.sidebar();
+        },
+      };
+      render(<App />);
+      await screen.findByText('Shopify theme structure: sections and metafields');
+      await vi.advanceTimersByTimeAsync(5100); // still waiting: nothing to reload
+      const before = sidebarCalls;
+      waiting = 0; // the deletion went through
+      await vi.advanceTimersByTimeAsync(5100);
+      await waitFor(() => expect(sidebarCalls).toBeGreaterThan(before));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows a folder that the background refresh filled, even when it imported nothing new', async () => {
     repo.setSetting('demo_data', '0'); // the background refresh only runs on real data
     const account = repo.filterOptions().accounts.find((a) => a.platform === 'chatgpt')!;

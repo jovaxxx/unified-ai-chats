@@ -134,11 +134,17 @@ export function App() {
   // How much is waiting to be sent to a platform, for the badge and the "sending…" hints.
   useEffect(() => {
     let cancelled = false;
+    let waiting: number | null = null;
     const load = () =>
       api
         .queueSummary()
         .then((q) => {
-          if (!cancelled) setQueueInfo(q);
+          if (cancelled) return;
+          setQueueInfo(q);
+          // A change finished on the platform (a deleted chat leaves the Trash and the counts): reload the views.
+          const now = q.pending + q.running;
+          if (waiting !== null && now < waiting) setVersion((v) => v + 1);
+          waiting = now;
         })
         .catch(() => undefined);
     void load();
