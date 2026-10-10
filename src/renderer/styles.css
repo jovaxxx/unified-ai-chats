@@ -430,6 +430,10 @@ h1 {
   line-height: 1.4;
   color: var(--muted);
 }
+.note--version {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
 .note--demo {
   color: var(--warn);
   font-weight: 500;

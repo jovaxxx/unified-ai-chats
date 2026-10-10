@@ -85,6 +85,8 @@ export interface WebHost {
 }
 
 export interface ApiDeps {
+  /** The version written inside the app (Electron: `app.getVersion()`). */
+  appVersion?: string;
   /** Where full copies of chats are saved before they are deleted on a platform. */
   exportDir?: string;
   /** Reads a stored image, so it can be copied into a safety copy. */
@@ -514,6 +516,7 @@ export function createApi(
       return result;
     },
     trashRetentionDays: async () => repo.trashRetentionDays,
+    appVersion: async () => deps.appVersion ?? 'dev',
     openOnPlatform: async (platform, remoteId) => {
       const url = platformUrl(
         z.enum(PLATFORMS).parse(platform),

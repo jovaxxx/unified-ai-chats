@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Platform, SidebarData } from '../../shared/types';
 import { MAX_PROFILES_PER_PLATFORM } from '../../shared/limits';
@@ -70,6 +70,13 @@ export function Sidebar({
       writeJson('closedProjects', next);
       return next;
     });
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    void window.api
+      .appVersion()
+      .then(setVersion)
+      .catch(() => undefined);
+  }, []);
   const hasLocal = data?.platforms.some((p) => p.platform === 'claude-code') ?? false;
   // Whether a platform already has all the accounts this version connects (the demo data does not count).
   const isFull = (platform: Platform) =>
@@ -549,6 +556,11 @@ export function Sidebar({
         </div>
         {data?.demo && <div className="note note--demo">{t('nav.demo')}</div>}
         <div className="note">{t('nav.localNote')}</div>
+        {version && (
+          <div className="note note--version" title={t('nav.versionHint')}>
+            {t('nav.version', { version })}
+          </div>
+        )}
         <div className="foot-row">
           <label className="lang">
             {t('nav.language')}

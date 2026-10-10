@@ -71,6 +71,8 @@ export interface Api {
   removeTag(id: number, tag: string): Promise<void>;
   /** Trash retention in days, for wording ("deleted after N days"). */
   trashRetentionDays(): Promise<number>;
+  /** The version of the app that is running, as written inside it. */
+  appVersion(): Promise<string>;
   /** Opens a platform page in the user's default browser. Only known https hosts are allowed. */
   openOnPlatform(platform: Platform, remoteId?: string): Promise<void>;
   /** Opens a link found inside a chat in the system browser. Only http(s) URLs are accepted. */
@@ -151,6 +153,7 @@ export const IPC_CHANNELS = {
   purge: 'api:purge',
   removeTag: 'api:removeTag',
   trashRetentionDays: 'api:trashRetentionDays',
+  appVersion: 'api:appVersion',
   openOnPlatform: 'api:openOnPlatform',
   openLink: 'api:openLink',
   connectClaudeCode: 'api:connectClaudeCode',

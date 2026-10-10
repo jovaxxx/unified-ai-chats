@@ -205,6 +205,14 @@ describe('bulk flow on fixtures', () => {
   });
 });
 
+describe('the version of the app', () => {
+  it('is written in the sidebar, so it is always known which one is running', async () => {
+    window.api = createApi(repo, { openExternal: async () => {}, appVersion: '0.2.0-test.7' });
+    render(<App />);
+    expect(await screen.findByText('Version 0.2.0-test.7')).toBeVisible();
+  });
+});
+
 describe('i18n', () => {
   it('switches to Italian and back', async () => {
     const user = await renderApp();

@@ -21,6 +21,8 @@
     "archive": "Archive",
     "connected": "Connected",
     "onePerPlatform": "This version connects one account per platform.",
+    "version": "Version {{version}}",
+    "versionHint": "The version of this app. Check it when you report a problem.",
     "addAccount": "Add account",
     "addAccountSoon": "Adding accounts arrives with the first platform connector",
     "localNote": "Data stays on this device.",

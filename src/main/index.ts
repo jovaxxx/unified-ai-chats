@@ -183,6 +183,7 @@ void app.whenReady().then(() => {
   // Full copies of chats deleted on a platform go where the user can find them (Documents), not in a hidden folder.
   const exportDir = join(app.getPath('documents'), 'Unified AI Chats', 'Exports');
   const api = createApi(repo, {
+    appVersion: app.getVersion(),
     web,
     media,
     exportDir,
