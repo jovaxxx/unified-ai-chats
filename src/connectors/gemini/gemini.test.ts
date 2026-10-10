@@ -13,6 +13,7 @@ import {
   buildBatchUrl,
   extractPageTokens,
   isAllowedRpc,
+  leftGemini,
   parseBatchPayload,
 } from './rpc';
 
@@ -109,6 +110,12 @@ describe('the pieces of a batchexecute call', () => {
     expect(isAllowedRpc('hNvQHb')).toBe(true);
     for (const other of ['StreamGenerate', 'VxUbXb', 'PCck7e', 'whPPme', '', 'MaZiqc2'])
       expect(isAllowedRpc(other)).toBe(false);
+  });
+
+  it('tells a sign-in redirect from an answer that does not say where it ended up', () => {
+    expect(leftGemini('https://gemini.google.com/app')).toBe(false);
+    expect(leftGemini('https://accounts.google.com/v3/signin')).toBe(true);
+    for (const unreadable of ['', 'not a url', '/app']) expect(leftGemini(unreadable)).toBe(false);
   });
 
   it('finds the tokens in the page, and says so when the form token is missing', () => {

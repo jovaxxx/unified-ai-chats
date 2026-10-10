@@ -5,6 +5,7 @@ import {
   buildBatchUrl,
   extractPageTokens,
   isAllowedRpc,
+  leftGemini,
   type PageTokens,
 } from '../connectors/gemini/rpc';
 import type { BatchRpc } from '../connectors/types';
@@ -37,7 +38,7 @@ export function createGeminiRpc(partition: string): BatchRpc {
     if (res.status === 401 || res.status === 403) {
       throw new SessionExpired(`Gemini answered ${res.status}. Sign in again.`);
     }
-    if (new URL(res.url).hostname !== 'gemini.google.com') {
+    if (leftGemini(res.url)) {
       throw new SessionExpired(
         'Gemini sent this session to the Google sign-in page. Sign in again.',
       );

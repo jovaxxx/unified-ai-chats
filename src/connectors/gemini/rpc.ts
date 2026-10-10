@@ -12,6 +12,18 @@ export const ALLOWED_RPCS: ReadonlySet<string> = new Set(['MaZiqc', 'hNvQHb']);
 
 export const isAllowedRpc = (rpcid: string): boolean => ALLOWED_RPCS.has(rpcid);
 
+/**
+ * Whether the page the session ended up on is a sign-in page rather than Gemini. An answer that does not say where it
+ * ended up (an empty or unreadable address) tells nothing, so it is not taken for a sign-in redirect.
+ */
+export function leftGemini(finalUrl: string): boolean {
+  try {
+    return new URL(finalUrl).hostname !== 'gemini.google.com';
+  } catch {
+    return false;
+  }
+}
+
 export interface PageTokens {
   /** The anti-forgery token the form must carry (`at`). */
   at: string;
