@@ -602,6 +602,17 @@ export class Repo {
     return due.length ? this.purge(due) : { removed: 0, skipped: 0, mediaPaths: [], mediaIds: [] };
   }
 
+  /** The chats of a profile that are in its lists (not in the Trash), with the platform's own id. */
+  liveRemoteIds(accountId: number): { id: number; remoteId: string }[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT id, remote_id FROM conversations WHERE account_id = ? AND state IN ('inbox','archived')",
+        )
+        .all(accountId) as { id: number; remote_id: string }[]
+    ).map((r) => ({ id: r.id, remoteId: r.remote_id }));
+  }
+
   /**
    * Whether this profile has conversations that must be read again: ones that came out empty, or that an older
    * importer read. A run then walks the whole list instead of stopping at the first unchanged conversation.

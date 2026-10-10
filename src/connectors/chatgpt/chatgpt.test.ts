@@ -232,6 +232,7 @@ function server(opts: {
   return {
     http,
     calls,
+    state: opts,
     detailCalls,
     flatCalls,
     failWith: (prefix: string, ...results: HttpResult[]) => failures.set(prefix, results),
@@ -763,6 +764,38 @@ describe('importing ChatGPT into the local inbox', () => {
     await c.api.signInStatus(attemptId);
     return (await c.api.signInFinish(attemptId, { type: 'new', label })).accountId;
   };
+
+  it('chats deleted on ChatGPT are moved to the Trash by a sync the user starts, and not by the background refresh', async () => {
+    const c = setup();
+    const work: Chat = { id: uuid(90), title: 'Work chat', update: '2026-09-21T09:00:00Z' };
+    const s = server({
+      chats: [
+        ...chats(3),
+        { id: uuid(60), title: 'In a project', update: '2026-09-01T00:00:00Z', project: PROJECT },
+      ],
+      projects: [{ id: PROJECT, name: 'Client project' }],
+      work: [work],
+    });
+    c.web.setHttp(s.http);
+    const accountId = await signedInProfile(c);
+    await c.api.syncProfiles([accountId]);
+    expect(c.repo.listChats({ accountId }).total).toBe(5);
+
+    // Two chats are deleted on ChatGPT (an ordinary one and the one in a project); the work chat stays.
+    const keep = s.state.chats.filter((x) => x.id !== uuid(1) && x.id !== uuid(60));
+    s.state.chats.length = 0;
+    s.state.chats.push(...keep);
+    c.repo.setSetting(`removal_check:${accountId}`, '');
+
+    await c.api.syncRecent(); // the background refresh does not look for deletions
+    expect(c.repo.listChats({ accountId }).total).toBe(5);
+
+    const stats = await c.api.syncProfiles([accountId]);
+    expect(stats.removed).toBe(2);
+    const live = c.repo.listChats({ accountId }).items.map((i) => i.title);
+    expect(live.sort()).toEqual(['Chat number 2', 'Chat number 3', 'Work chat'].sort());
+    expect(c.repo.sidebar().trashed).toBe(2);
+  });
 
   it('Sync now brings chats, projects and archive in, searchable and readable', async () => {
     const c = setup();

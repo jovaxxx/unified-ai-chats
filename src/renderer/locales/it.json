@@ -107,6 +107,8 @@
     "synced_other": "{{count}} sessioni importate.",
     "syncFailed_one": "{{count}} non è stata letta: il formato del file potrebbe essere cambiato.",
     "syncFailed_other": "{{count}} non sono state lette: il formato dei file potrebbe essere cambiato.",
+    "removed_one": "{{count}} chat eliminata sulla piattaforma è stata spostata nel Cestino.",
+    "removed_other": "{{count}} chat eliminate sulla piattaforma sono state spostate nel Cestino.",
     "upToDate": "Già aggiornato.",
     "profileCreatedSignedIn": "Profilo «{{label}}» creato e collegato.",
     "alreadyConnected": "Eri già collegato come «{{label}}»: l’accesso è stato rinnovato, nessun nuovo profilo.",

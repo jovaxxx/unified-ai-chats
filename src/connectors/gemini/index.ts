@@ -67,6 +67,10 @@ export function createGeminiConnector(opts?: ClientOptions): Connector {
       }
     },
 
+    async *listAllIds(ctx) {
+      for await (const chat of of(ctx).chats()) yield chat.id;
+    },
+
     notes: (ctx) => notesOf.get(ctx) ?? {},
 
     /**

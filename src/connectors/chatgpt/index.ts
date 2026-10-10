@@ -177,6 +177,25 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
       }
     },
 
+    /** Every chat ChatGPT has: the ordinary lists, the archive, the work list, every project and the pins. */
+    async *listAllIds(ctx) {
+      const client = clientFor(ctx, opts);
+      const seen = new Set<string>();
+      const fresh = (id: string) => (seen.has(id) ? false : (seen.add(id), true));
+      for (const archived of [false, true]) {
+        for await (const item of client.conversations(archived)) if (fresh(item.id)) yield item.id;
+      }
+      for (const archived of [false, true]) {
+        for await (const item of client.conversations(archived, undefined, 'tpp'))
+          if (fresh(item.id)) yield item.id;
+      }
+      for (const project of await client.projects()) {
+        for await (const item of client.projectConversations(project.id))
+          if (fresh(item.id)) yield item.id;
+      }
+      for (const chat of (await client.pins()).chats) if (fresh(chat.id)) yield chat.id;
+    },
+
     notes: (ctx) => listingNotes.get(ctx) ?? {},
 
     async imageLink(ctx, image, remoteConversationId) {

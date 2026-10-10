@@ -104,6 +104,20 @@ export function createClaudeConnector(opts?: ClientOptions): Connector {
       listing.notes.found = seen.size;
     },
 
+    async *listAllIds(ctx) {
+      const c = of(ctx);
+      const seen = new Set<string>();
+      for (const org of await c.organizations()) {
+        for (const filter of ['active', 'archived', 'starred'] as const) {
+          for await (const item of c.conversations(org, filter)) {
+            if (seen.has(item.uuid)) continue;
+            seen.add(item.uuid);
+            yield item.uuid;
+          }
+        }
+      }
+    },
+
     notes: (ctx) => listings.get(ctx)?.notes ?? {},
 
     async getConversation(ctx, remoteId): Promise<RemoteConversation> {

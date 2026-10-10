@@ -366,9 +366,12 @@ export function App() {
       setToast({ error: true, message: s.errors[0] });
     } else {
       let message =
-        s.imported === 0 && s.failed === 0
+        s.imported === 0 && s.failed === 0 && !s.removed
           ? t('toast.upToDate')
-          : t('toast.synced', { count: s.imported });
+          : s.imported === 0 && s.failed === 0
+            ? ''
+            : t('toast.synced', { count: s.imported });
+      if (s.removed) message = `${message} ${t('toast.removed', { count: s.removed })}`.trim();
       if (s.failed > 0) message += ` ${t('toast.syncFailed', { count: s.failed })}`;
       if (s.images?.downloaded) message += ` ${t('toast.images', { count: s.images.downloaded })}`;
       setToast({ message, ...(s.failed > 0 ? { error: true } : {}) });

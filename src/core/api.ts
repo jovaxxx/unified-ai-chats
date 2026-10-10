@@ -167,7 +167,7 @@ export function createApi(
 
   const syncWeb = async (
     accountId: number,
-    opts: { includeProjects?: boolean } = {},
+    opts: { includeProjects?: boolean; checkRemoved?: boolean } = {},
   ): Promise<SyncStats> => {
     const acc = repo.getAccount(accountId);
     if (
@@ -201,9 +201,15 @@ export function createApi(
       },
     };
     const label = repo.filterOptions().accounts.find((a) => a.id === accountId)?.label ?? '';
-    const stats = await syncAccount(repo, connector, ctx, (p) => {
-      progress.set(accountId, { accountId, label, ...p, waitingSeconds: null });
-    });
+    const stats = await syncAccount(
+      repo,
+      connector,
+      ctx,
+      (p) => {
+        progress.set(accountId, { accountId, label, ...p, waitingSeconds: null });
+      },
+      { ...(opts.checkRemoved ? { checkRemoved: true } : {}) },
+    );
     // Then the images of those chats. A problem here never fails the sync: what is left waits for the next one.
     if (deps.media && deps.downloadImages && acc.platform === 'chatgpt') {
       try {
@@ -231,12 +237,13 @@ export function createApi(
   /** Syncs the given profiles at the same time, each on its own; one failing never stops the others. */
   const syncMany = async (
     ids: number[],
-    opts: { includeProjects?: boolean } = {},
+    opts: { includeProjects?: boolean; checkRemoved?: boolean } = {},
   ): Promise<SyncStats> => {
     const total: SyncStats = { seen: 0, imported: 0, failed: 0, errors: [] };
     const add = (s: SyncStats) => {
       total.seen += s.seen;
       total.imported += s.imported;
+      if (s.removed) total.removed = (total.removed ?? 0) + s.removed;
       total.failed += s.failed;
       total.errors.push(...s.errors);
       if (s.images) {
@@ -724,9 +731,11 @@ export function createApi(
         waitingSeconds: waiting.get(p.accountId) ?? null,
       })),
 
-    syncProfiles: async (ids) => syncMany(z.array(idSchema).max(200).parse(ids)),
+    // A sync the user asked for also looks for chats deleted on the platform; the background refresh does not.
+    syncProfiles: async (ids) =>
+      syncMany(z.array(idSchema).max(200).parse(ids), { checkRemoved: true }),
 
-    syncAll: async () => syncMany(syncableIds()),
+    syncAll: async () => syncMany(syncableIds(), { checkRemoved: true }),
 
     // A quick refresh for the background, like a mail client checking for new mail: only what changed lately. The
     // walk through every project's chat list is more requests, so it is done on every fifth refresh (and by the

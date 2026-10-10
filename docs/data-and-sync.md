@@ -35,6 +35,7 @@ Sync is the only thing that talks to a platform, using the session of the profil
 - **Chats not changed for 60 days** are not read again unless the platform reports a change.
 - **In the background:** while the app is open it refreshes recent chats every 3 minutes and when the window comes back into focus, and shows a small note when something was updated. Every fifth refresh also looks through your projects.
 - **Sync now** does the same incremental refresh on demand, for one platform or one profile. Profiles sync independently and at the same time, so a slow one never holds another back.
+- **Chats you deleted on the platform** follow into the Trash here when you press **Sync now**: the app looks through the platform's full lists, asks for each chat that is missing, and only a clear "not found" counts. They wait in the Trash for the usual days before they go for good. The background refresh never does this, and it is done at most every ten minutes, a few hundred chats at a time.
 - **It is safe to interrupt.** A chat already stored and unchanged is skipped, so an import that was stopped resumes where it stopped.
 - **Read-only:** sync never changes anything on a platform.
 

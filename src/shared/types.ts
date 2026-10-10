@@ -182,6 +182,8 @@ export interface SyncStats {
   images?: { downloaded: number; failed: number };
   /** Kinds of content the importer left out, with counts (names only). Helps spot what it does not understand yet. */
   skipped?: Record<string, number>;
+  /** Chats found to be gone from the platform and moved to the Trash here (confirmed one by one). */
+  removed?: number;
   /** Numbers about what the platform listed (chats found, from pins, projects…), to spot gaps. Never content. */
   listing?: Record<string, number>;
 }

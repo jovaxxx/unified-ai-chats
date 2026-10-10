@@ -119,6 +119,11 @@ export interface Connector {
   delete?(ctx: AccountContext, remoteId: string): Promise<void>;
   /** The platform's own complete record of a conversation, for the safety copy made before deleting it. */
   exportRaw?(ctx: AccountContext, remoteId: string): Promise<unknown>;
+  /**
+   * Every chat the platform has right now: the ids only, from its full lists. Used to notice chats that were deleted on
+   * the platform. A chat missing from here is only a candidate: it is confirmed by asking the platform for it.
+   */
+  listAllIds?(ctx: AccountContext): AsyncIterable<string>;
   /** Throws if the signed-in session is not the account this profile was made for. Called before any change. */
   verifyAccount?(ctx: AccountContext): Promise<void>;
   /**

@@ -107,6 +107,8 @@
     "synced_other": "Imported {{count}} sessions.",
     "syncFailed_one": "{{count}} could not be read: its file format may have changed.",
     "syncFailed_other": "{{count}} could not be read: their file format may have changed.",
+    "removed_one": "{{count}} chat deleted on the platform was moved to the Trash.",
+    "removed_other": "{{count}} chats deleted on the platform were moved to the Trash.",
     "upToDate": "Already up to date.",
     "profileCreatedSignedIn": "Profile “{{label}}” created and signed in.",
     "alreadyConnected": "You were already connected as “{{label}}”: its sign-in was refreshed, no new profile.",
