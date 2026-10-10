@@ -132,6 +132,9 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
       notes.firstPageNewest = sec(client.firstPages.active?.newest);
       notes.archivedFirstPageItems = client.firstPages.archived?.items ?? 0;
       notes.newerThan = sec(since?.getTime());
+      // How many of the first page's chats came from each kind of origin (the word the site gives it, never content).
+      for (const [name, n] of Object.entries(client.firstPages.active?.origins ?? {}))
+        notes[`origin:${name}`] = n;
       for (const pin of pinnedChats) {
         if (seen.has(pin.id)) continue;
         seen.add(pin.id);

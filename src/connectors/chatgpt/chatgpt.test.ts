@@ -594,6 +594,24 @@ describe('ChatGPT connector', () => {
     expect(notes.firstPageNewest).toBeGreaterThan(notes.newerThan!); // something newer than the cut-off exists
   });
 
+  it('counts the first page by the origin word the site gives each chat, and ignores anything odd', async () => {
+    const s = server({ chats: chats(6) });
+    const origins = ['work', 'work', null, 'my private words', 'agent', null];
+    const http: HttpJson = async (path) => {
+      const res = await s.http(path);
+      const j = res.json as { items?: Record<string, unknown>[] } | undefined;
+      if (path.startsWith('/backend-api/conversations?') && j?.items) {
+        j.items.forEach((it, i) => (it.conversation_origin = origins[i % origins.length]));
+      }
+      return res;
+    };
+    const c = createChatGptConnector({ sleep: noSleep });
+    const x = ctx(http);
+    await list(c, x);
+    expect(c.notes!(x)).toMatchObject({ 'origin:work': 2, 'origin:agent': 1 });
+    expect(JSON.stringify(c.notes!(x))).not.toContain('private');
+  });
+
   it('refuses to import when the profile is signed in as a different account', async () => {
     const s = server({ userId: 'user-BBB', chats: chats(2) });
     const c = createChatGptConnector({ sleep: noSleep });

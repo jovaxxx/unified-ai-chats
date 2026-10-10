@@ -40,6 +40,14 @@ const QUERY_VALUE_KEYS = new Set([
   'page',
   'per_page',
   'rpcids',
+  // Which kind of chats a list asks for (a short word such as the chat's origin), not who they belong to.
+  'conversation_origin',
+  'exclude_conversation_origin',
+  'hide_snorlax',
+  'expand',
+  'is_starred',
+  'owned_only',
+  'item_type',
 ]);
 const QUERY_VALUE = /^[a-z0-9_.-]{1,20}$/i;
 

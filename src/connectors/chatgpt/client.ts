@@ -60,8 +60,8 @@ export class ChatGptClient {
   listTotal: number | null = null;
   /** What the first page of each list held (how many chats, and the newest change), for spotting gaps. */
   readonly firstPages: {
-    active?: { items: number; newest: number | null };
-    archived?: { items: number; newest: number | null };
+    active?: { items: number; newest: number | null; origins: Record<string, number> };
+    archived?: { items: number; newest: number | null; origins: Record<string, number> };
   } = {};
   /** Added to every pause after the site pushed back, so the rest of the run is gentler. */
   private extraPaceMs = 0;
@@ -165,9 +165,16 @@ export class ChatGptClient {
       // What the first page said, noted BEFORE reading it, so it is known even when the list is cut short.
       if (offset === 0) {
         const newest = res.items.reduce((m, i) => Math.max(m, Date.parse(i.update_time) || 0), 0);
+        const origins: Record<string, number> = {};
+        for (const item of res.items) {
+          const o = (item as { conversation_origin?: unknown }).conversation_origin;
+          if (typeof o === 'string' && /^[a-z0-9_-]{1,40}$/i.test(o))
+            origins[o] = (origins[o] ?? 0) + 1;
+        }
         this.firstPages[archived ? 'archived' : 'active'] = {
           items: res.items.length,
           newest: newest || null,
+          origins,
         };
         if (!archived) this.listTotal = res.total ?? null;
       }

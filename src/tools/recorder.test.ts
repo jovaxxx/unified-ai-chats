@@ -345,6 +345,26 @@ describe('StructureRecorder (Chrome DevTools Protocol events)', () => {
   });
 });
 
+describe('list filters that name a kind of chat are kept, other values are not', () => {
+  it('shows the word of conversation_origin and its siblings, but never anything else', () => {
+    const q = describeQuery(
+      new URL(
+        'https://chatgpt.com/backend-api/conversations?limit=20&conversation_origin=work&exclude_conversation_origin=agent&hide_snorlax=true&title=My%20private%20thing&cursor=SECRETCURSOR',
+      ).searchParams,
+    );
+    expect(q).toMatchObject({
+      limit: '20',
+      conversation_origin: 'work',
+      exclude_conversation_origin: 'agent',
+      hide_snorlax: 'true',
+      title: '<value>',
+      cursor: '<value>',
+    });
+    expect(JSON.stringify(q)).not.toContain('private');
+    expect(JSON.stringify(q)).not.toContain('SECRET');
+  });
+});
+
 describe('positional shapes keep the kind of a link and a media type, never a value', () => {
   it('says which host, which fixed path word, which file type and which format hint', () => {
     const shape = JSON.stringify(
