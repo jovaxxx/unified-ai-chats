@@ -784,6 +784,20 @@ h1 {
   font-weight: 400;
   font-size: 32px;
   line-height: 1.15;
+  /* A very long title (some sources send a whole prompt) must never push the chat out of view. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.reader-was {
+  display: inline-block;
+  max-width: min(100%, 60ch);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 .rename {
   display: flex;

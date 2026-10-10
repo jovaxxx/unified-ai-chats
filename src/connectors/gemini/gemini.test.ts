@@ -7,7 +7,7 @@ import { EndpointChanged, NotFound, SessionExpired } from '../errors';
 import type { BatchRpc } from '../types';
 import { GeminiClient } from './client';
 import { createGeminiConnector } from './index';
-import { findChats, findTurns, parseConversation } from './parse';
+import { cleanTitle, findChats, findTurns, parseConversation, withoutPlaceholders } from './parse';
 import {
   buildBatchBody,
   buildBatchUrl,
@@ -246,6 +246,107 @@ describe('finding chats and turns by what they look like', () => {
   });
 });
 
+describe('long titles and pictures', () => {
+  it('shortens a title to one line that fits, and keeps a short one as it is', () => {
+    expect(cleanTitle('A short title')).toBe('A short title');
+    expect(cleanTitle('\n  First   line \n second line')).toBe('First line');
+    const long = `${'word '.repeat(300)}end`;
+    const cut = cleanTitle(long);
+    expect(cut.length).toBeLessThanOrEqual(101);
+    expect(cut.endsWith('…')).toBe(true);
+    expect(cleanTitle('x'.repeat(1181)).length).toBeLessThanOrEqual(101); // no spaces at all
+    expect(cleanTitle('   ')).toBe('');
+  });
+
+  it('the chat list never carries a long title', () => {
+    const rows = [chatRow(1, `${'long '.repeat(200)}`, T0)];
+    expect(findChats([null, null, rows])[0]!.title.length).toBeLessThanOrEqual(101);
+  });
+
+  it('takes out the made-up picture links and keeps what is real', () => {
+    const out = withoutPlaceholders(
+      'Here you go!\n\nhttp://googleusercontent.com/image_generation_content/0\n\n[Pic](http://googleusercontent.com/image_generation_content/1)\n\nhttp://googleusercontent.com/generated_video_content/0',
+    );
+    expect(out.images).toBe(2);
+    expect(out.videos).toBe(1);
+    expect(out.text).not.toContain('googleusercontent');
+    expect(out.text).toContain('Here you go!');
+    expect(out.text).toContain('open this chat on Gemini');
+  });
+
+  const withImages = (links: string[]) => {
+    const t = turn(
+      1,
+      0,
+      'Draw a bee',
+      'Here it is!\n\nhttp://googleusercontent.com/image_generation_content/0',
+      T0,
+    );
+    // The description of one picture: its link at position 3. A second size sits next to it in the same list.
+    const description = (url: string) => [
+      null,
+      1,
+      'bee.png',
+      url,
+      null,
+      'prompt-ish text',
+      null,
+      null,
+      1,
+    ];
+    (t[3] as unknown[])[0] = [
+      [
+        'rc_aaaaaaaa',
+        ['Here it is!\n\nhttp://googleusercontent.com/image_generation_content/0'],
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          links.map((u) => [
+            [[[null, null, null, description(u), null, null, description(`${u}=s64`)]]],
+          ]),
+        ],
+      ],
+    ];
+    return t;
+  };
+
+  it("shows a picture as an image block, takes its link from Gemini's own image host, and drops the dead link", () => {
+    const url = 'https://lh3.googleusercontent.com/gg/AbCdEf123456';
+    const chat = parseConversation([[[withImages([url])]]], id(1));
+    const reply = chat.messages.find((m) => m.role === 'assistant')!;
+    expect(reply.blocks).toEqual([
+      { type: 'text', text: 'Here it is!' },
+      { type: 'image', ref: url },
+    ]);
+    expect(chat.images).toEqual([{ ref: url, kind: 'generated' }]); // only the first size
+    expect(chat.skipped).toBeUndefined();
+  });
+
+  it("never takes a link that is not on Gemini's image host", () => {
+    const chat = parseConversation(
+      [[[withImages(['https://evil.example/x.png', 'http://lh3.googleusercontent.com/x'])]]],
+      id(1),
+    );
+    expect(chat.images).toBeUndefined();
+    expect(chat.skipped).toEqual({ 'images:link-not-found': 1 }); // said, not hidden
+  });
+});
+
 describe('the Gemini client', () => {
   const client = (g: ReturnType<typeof gemini>) => new GeminiClient(g.rpc, { sleep: noSleep });
   const all = async (c: GeminiClient) => {
@@ -383,6 +484,79 @@ describe('Gemini in the local inbox', () => {
     const second = await c.api.syncProfiles([accountId]);
     expect(second.imported).toBe(0); // nothing changed: the list is read, no chat is read again
     expect(g.calls.every((x) => x.rpcid === 'MaZiqc')).toBe(true);
+  });
+
+  it("a generated picture is shown from its link after a sync, with the profile's session", async () => {
+    const c = setup();
+    const accountId = await profile(c);
+    const url = 'https://lh3.googleusercontent.com/gg/AbCdEf123456';
+    const g = gemini({ chats: [{ n: 1, title: 'Bee picture', sec: T0, turns: 1 }] });
+    const plain = g.rpc;
+    // The one turn of this chat carries a picture and the dead link to it.
+    c.web.setRpc(async (call) => {
+      const res = await plain(call);
+      if (call.rpcid !== 'hNvQHb') return res;
+      const placeholder = 'Here it is!\n\nhttp://googleusercontent.com/image_generation_content/0';
+      const withPicture = turn(1, 0, 'Draw a bee', placeholder, T0);
+      (withPicture[3] as unknown[][])[0]![0] = [
+        'rc_aaaaaaaa',
+        [placeholder],
+        ...Array<null>(10).fill(null),
+        [null, null, null, null, null, null, null, [[[[null, null, null, [null, 1, 'bee', url]]]]]],
+      ];
+      return { status: 200, text: answer('hNvQHb', [[[withPicture]]]) };
+    });
+    const asked: string[] = [];
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    c.web.setDownload(async (u) => {
+      asked.push(u);
+      return { status: 200, bytes: png, mime: 'image/png' };
+    });
+
+    await c.api.syncProfiles([accountId]);
+    const chatId = c.repo.listChats({ accountId }).items[0]!.id;
+    const reply = c.repo.getChat(chatId)!.messages.find((m) => m.role === 'assistant')!;
+    const image = reply.blocks.find((b) => b.type === 'image');
+    expect(image).toMatchObject({ type: 'image', ref: url });
+    const mediaId = (image as { mediaId?: number | null }).mediaId!;
+    expect(mediaId).toBeTruthy();
+    const shown = await c.api.imageData(mediaId);
+    expect(shown?.mime).toBe('image/png');
+    expect(asked).toEqual([url]);
+    expect(JSON.stringify(reply.blocks)).not.toContain('image_generation_content');
+  });
+
+  it("downloads a picture only from Gemini's image host", async () => {
+    const c = createGeminiConnector();
+    const asked: string[] = [];
+    const ctx = {
+      accountId: 1,
+      downloadUrl: async (u: string) => {
+        asked.push(u);
+        return { status: 200, bytes: new Uint8Array([1, 2, 3]), mime: 'image/png' };
+      },
+    };
+    const ok = await c.downloadImage!(
+      ctx,
+      { ref: 'https://lh3.googleusercontent.com/gg/abc' },
+      id(1),
+    );
+    expect(ok.mime).toBe('image/png');
+    for (const bad of [
+      'https://evil.example/a.png',
+      'http://lh3.googleusercontent.com/a',
+      'file:///etc/passwd',
+      '',
+    ])
+      await expect(c.downloadImage!(ctx, { ref: bad }, id(1))).rejects.toThrow(NotFound);
+    expect(asked).toEqual(['https://lh3.googleusercontent.com/gg/abc']);
+    const gone = {
+      ...ctx,
+      downloadUrl: async () => ({ status: 404, bytes: new Uint8Array(), mime: null }),
+    };
+    await expect(
+      c.downloadImage!(gone, { ref: 'https://lh3.googleusercontent.com/gg/abc' }, id(1)),
+    ).rejects.toThrow(NotFound);
   });
 
   it('the "Open on Gemini" address drops the c_ of the id', async () => {

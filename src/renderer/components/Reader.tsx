@@ -157,12 +157,19 @@ export function Reader({
             </button>
           </form>
         ) : (
-          <h1 className="reader-title">{chat.title}</h1>
+          <h1 className="reader-title" title={chat.title}>
+            {chat.title}
+          </h1>
         )}
 
         <div className="reader-meta">
           {chat.remoteTitle !== chat.title && (
-            <>{t('reader.originalTitle', { title: chat.remoteTitle })} · </>
+            <>
+              <span className="reader-was" title={chat.remoteTitle}>
+                {t('reader.originalTitle', { title: chat.remoteTitle })}
+              </span>{' '}
+              ·{' '}
+            </>
           )}
           {t('reader.messages', { count: chat.messageCount })} · {range} ·{' '}
           <span title={updated.toLocaleString(i18n.language)}>

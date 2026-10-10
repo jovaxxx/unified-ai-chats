@@ -7,7 +7,7 @@ import type {
   RemoteConversationSummary,
 } from '../types';
 import { GeminiClient } from './client';
-import { parseConversation } from './parse';
+import { isImageLink, parseConversation } from './parse';
 
 /** What a sync's listing learned about each chat: the title and the last change, which the chat itself lacks. */
 const listings = new WeakMap<AccountContext, Map<string, { title: string; updatedAt: string }>>();
@@ -68,6 +68,19 @@ export function createGeminiConnector(opts?: ClientOptions): Connector {
     },
 
     notes: (ctx) => notesOf.get(ctx) ?? {},
+
+    /** Fetches one picture from Gemini's own image host, as this profile's session. */
+    async downloadImage(ctx, image) {
+      if (!ctx.downloadUrl) throw new Error('The Gemini connector needs a way to download files.');
+      if (!isImageLink(image.ref))
+        throw new NotFound('This image reference is not one this app knows how to fetch.');
+      const res = await ctx.downloadUrl(image.ref);
+      if (res.status === 403 || res.status === 404 || res.status === 410) {
+        throw new NotFound(`The image file is gone (HTTP ${res.status}).`);
+      }
+      if (res.status !== 200) throw new Error(`Downloading an image answered HTTP ${res.status}.`);
+      return { bytes: res.bytes, mime: res.mime ?? '' };
+    },
 
     async getConversation(ctx, remoteId): Promise<RemoteConversation> {
       const payload = await of(ctx).chat(remoteId);

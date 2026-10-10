@@ -305,16 +305,17 @@ export function createApi(
     const failedAt = imageFailed.get(id);
     if (failedAt && Date.now() - failedAt < FAIL_MEMORY_MS) return null;
     const acc = repo.getAccount(src.accountId);
-    if (!acc || acc.platform !== 'chatgpt' || !deps.web) return null;
+    if (!acc || (acc.platform !== 'chatgpt' && acc.platform !== 'gemini') || !deps.web) return null;
     const lane = nextLane++ % lanes.length;
     const job = lanes[lane]!.then(async () => {
       const again = imageCache.get(id);
       if (again) return again;
       try {
-        const got = await chatgptConnector.downloadImage!(
+        const got = await (acc.platform === 'gemini' ? geminiConnector : chatgptConnector)
+          .downloadImage!(
           {
             accountId: src.accountId,
-            http: deps.web!.httpFor(acc.partition),
+            ...(acc.platform === 'gemini' ? {} : { http: deps.web!.httpFor(acc.partition) }),
             downloadUrl: deps.web!.downloadFor(acc.partition),
             expectedIdentity: acc.identity,
           },

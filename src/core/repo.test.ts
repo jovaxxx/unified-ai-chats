@@ -844,3 +844,22 @@ describe('backup before a migration', () => {
 
 import { readdirSync } from 'node:fs';
 const readdirNames = (d: string) => readdirSync(d);
+
+describe('migration 10', () => {
+  it('makes Gemini chats be read again once, and leaves the other platforms alone', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    for (let i = 0; i < 9; i++) db.exec(migrations[i] as string);
+    db.exec('PRAGMA user_version = 9');
+    db.exec(`
+      INSERT INTO accounts (id, platform, label, partition) VALUES (1, 'gemini', 'G', 'persist:gemini-a'), (2, 'chatgpt', 'C', 'persist:x');
+      INSERT INTO conversations (id, account_id, remote_id, remote_title, title, parse_version, created_at, updated_at, remote_updated_at)
+        VALUES (1, 1, 'a', 't', 't', 2, 'x', 'x', 'x'), (2, 2, 'b', 't', 't', 2, 'x', 'x', 'x');
+    `);
+    migrate(db);
+    expect(db.prepare('SELECT id, parse_version FROM conversations ORDER BY id').all()).toEqual([
+      { id: 1, parse_version: 0 },
+      { id: 2, parse_version: 2 },
+    ]);
+  });
+});

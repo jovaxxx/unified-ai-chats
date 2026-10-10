@@ -191,4 +191,10 @@ export const migrations: string[] = [
    WHERE account_id IN (SELECT id FROM accounts WHERE platform = 'claude-code')
      AND name IN ('Documents','Desktop','Downloads');
   `,
+  /* 10: Gemini chats read before this keep very long titles and show their pictures as dead links. They are read
+         again once (the importer version of their rows goes back to 0); other platforms are not touched. */
+  `
+  UPDATE conversations SET parse_version = 0
+   WHERE account_id IN (SELECT id FROM accounts WHERE platform = 'gemini');
+  `,
 ];

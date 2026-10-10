@@ -1,6 +1,6 @@
 import type { ContentBlock } from '../../shared/types';
 import { EndpointChanged } from '../errors';
-import type { RemoteConversation, RemoteMessage } from '../types';
+import type { RemoteConversation, RemoteImage, RemoteMessage } from '../types';
 
 /**
  * Gemini answers with unnamed, position-based arrays. These functions find what the app needs by what it looks like
@@ -21,12 +21,29 @@ export interface Turn {
   at: string;
   user: string;
   assistant: string;
+  /** Links to the images of the answer, in order, as Gemini's own image host gives them. */
+  images: string[];
 }
 
 const MAX_DEPTH = 14;
 const MAX_NODES = 200_000;
 const CHAT_ID = /^c_[A-Za-z0-9_-]{6,}$/;
 const RESPONSE_ID = /^r_[A-Za-z0-9_-]{6,}$/;
+
+const TITLE_MAX = 100;
+
+/** A title for the list: the first line, spaces collapsed, cut at a word. Gemini may send a whole prompt as the title. */
+export function cleanTitle(raw: string): string {
+  const line =
+    raw
+      .split('\n')
+      .map((l) => l.replace(/\s+/g, ' ').trim())
+      .find((l) => l !== '') ?? '';
+  if (line.length <= TITLE_MAX) return line;
+  const cut = line.slice(0, TITLE_MAX);
+  const atWord = cut.lastIndexOf(' ');
+  return `${(atWord > TITLE_MAX * 0.6 ? cut.slice(0, atWord) : cut).trimEnd()}…`;
+}
 
 /** `[1712345678, 123456000]` → ISO time. Null if it is not a plausible time. */
 export function timeOf(pair: unknown): string | null {
@@ -58,7 +75,7 @@ export function findChats(payload: unknown): ListedChat[] {
     const updatedAt = timeOf(a[5]);
     if (typeof id !== 'string' || !CHAT_ID.test(id) || typeof title !== 'string' || !updatedAt)
       return false;
-    out.push({ id, title, updatedAt });
+    out.push({ id, title: cleanTitle(title), updatedAt });
     return true;
   });
   return out;
@@ -86,9 +103,55 @@ export function findTurns(payload: unknown): Turn[] {
       return false;
     if (seen.has(responseId)) return true;
     seen.add(responseId);
-    out.push({ chatId, responseId, at, user: userText(a[2]), assistant: assistantText(a[3]) });
+    out.push({
+      chatId,
+      responseId,
+      at,
+      user: userText(a[2]),
+      assistant: assistantText(a[3]),
+      images: imageLinks(a[3]),
+    });
     return true;
   });
+  return out;
+}
+
+/** Gemini's own image host: `lh3.googleusercontent.com` and the like. Nothing else is ever treated as an image. */
+export function isImageLink(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 2000) return false;
+  try {
+    const u = new URL(value);
+    return (
+      u.protocol === 'https:' &&
+      (u.hostname === 'googleusercontent.com' || u.hostname.endsWith('.googleusercontent.com'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The images of an answer. Each is described by a list with its link at position 3; when one list holds two such
+ * descriptions (the picture and a second size of it, by the look of the report), only the first is taken.
+ * NOT confirmed on a real account: the report shows the positions, not the links.
+ */
+function imageLinks(part: unknown): string[] {
+  const out: string[] = [];
+  const go = (v: unknown, depth: number) => {
+    if (!Array.isArray(v) || depth > MAX_DEPTH) return;
+    let taken = false;
+    for (const child of v) {
+      if (Array.isArray(child) && isImageLink(child[3])) {
+        if (!taken) {
+          taken = true;
+          if (!out.includes(child[3])) out.push(child[3]);
+        }
+        continue;
+      }
+      go(child, depth + 1);
+    }
+  };
+  go(part, 0);
   return out;
 }
 
@@ -113,6 +176,36 @@ function assistantText(part: unknown): string {
 /** What the read-a-chat call returns per page, as the site asks for it. A full page may mean there is more. */
 export const TURNS_PER_PAGE = 10;
 
+const PLACEHOLDER =
+  /(?:\[[^\]]*\]\()?https?:\/\/googleusercontent\.com\/(image_generation_content|generated_video_content)\/\d+\)?/g;
+
+/**
+ * Gemini's text points at its pictures and videos with made-up links (`googleusercontent.com/image_generation_content/0`)
+ * that lead nowhere. They are taken out: the pictures come as images, a video as a short note.
+ */
+export function withoutPlaceholders(text: string): {
+  text: string;
+  images: number;
+  videos: number;
+} {
+  let images = 0;
+  let videos = 0;
+  const cleaned = text
+    .replace(PLACEHOLDER, (_all, kind: string) => {
+      if (kind === 'image_generation_content') {
+        images++;
+        return '';
+      }
+      videos++;
+      return VIDEO_NOTE;
+    })
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return { text: cleaned, images, videos };
+}
+
+const VIDEO_NOTE = '(A video was generated here: open this chat on Gemini to watch it.)';
+
 export function parseConversation(
   payload: unknown,
   remoteId: string,
@@ -128,24 +221,41 @@ export function parseConversation(
     );
 
   const messages: RemoteMessage[] = [];
+  const images = new Map<string, RemoteImage>();
+  const skipped: Record<string, number> = {};
+  const skip = (kind: string, n = 1) => {
+    skipped[kind] = (skipped[kind] ?? 0) + n;
+  };
   for (const t of turns) {
-    const text = (s: string): ContentBlock[] => (s.trim() ? [{ type: 'text', text: s }] : []);
-    if (t.user.trim()) messages.push({ role: 'user', blocks: text(t.user), createdAt: t.at });
-    if (t.assistant.trim())
-      messages.push({ role: 'assistant', blocks: text(t.assistant), createdAt: t.at });
+    if (t.user.trim())
+      messages.push({ role: 'user', blocks: [{ type: 'text', text: t.user }], createdAt: t.at });
+    const reply = withoutPlaceholders(t.assistant);
+    const blocks: ContentBlock[] = [];
+    if (reply.text) blocks.push({ type: 'text', text: reply.text });
+    for (const ref of t.images) {
+      blocks.push({ type: 'image', ref });
+      if (!images.has(ref)) images.set(ref, { ref, kind: 'generated' });
+    }
+    // Pictures the text pointed at but whose links were not found: counted, never hidden.
+    if (reply.images > t.images.length)
+      skip('images:link-not-found', reply.images - t.images.length);
+    if (reply.videos > 0) skip('videos', reply.videos);
+    if (blocks.length > 0) messages.push({ role: 'assistant', blocks, createdAt: t.at });
   }
   const firstUser =
     turns
       .find((t) => t.user.trim())
       ?.user.trim()
       .split('\n')[0] ?? '';
-  const title = listed?.title.trim() || (firstUser ? firstUser.slice(0, 80) : 'Untitled');
+  const title = cleanTitle(listed?.title ?? '') || cleanTitle(firstUser) || 'Untitled';
   const last = turns[turns.length - 1]!.at;
   return {
     remoteId,
     remoteTitle: title,
     // A full page of turns may not be the whole chat: counted, never hidden.
-    ...(turns.length >= TURNS_PER_PAGE ? { skipped: { 'turns:maybe-more': 1 } } : {}),
+    ...(turns.length >= TURNS_PER_PAGE ? { skipped: { ...skipped, 'turns:maybe-more': 1 } } : {}),
+    ...(turns.length < TURNS_PER_PAGE && Object.keys(skipped).length > 0 ? { skipped } : {}),
+    ...(images.size > 0 ? { images: [...images.values()] } : {}),
     createdAt: turns[0]!.at,
     updatedAt: listed?.updatedAt ?? last,
     messages,

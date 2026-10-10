@@ -6,7 +6,7 @@ import type { SignInProbe, WebHost, WebTarget } from '../core/api';
 import type { BatchRpc, DownloadUrl, HttpJson } from '../connectors/types';
 import { createChatGptDownloader, createChatGptHttp } from './chatgptHttp';
 import { createClaudeHttp } from './claudeHttp';
-import { createGeminiRpc } from './geminiHttp';
+import { createGeminiDownloader, createGeminiRpc } from './geminiHttp';
 import { platformUrl } from '../core/platforms';
 import type { Platform, RecorderSaved, RecorderStatus } from '../shared/types';
 import { StructureRecorder } from '../tools/recorder';
@@ -243,7 +243,9 @@ export class ElectronWebHost implements WebHost {
   }
 
   downloadFor(partition: string): DownloadUrl {
-    return createChatGptDownloader(partition);
+    return partition.startsWith('persist:gemini-')
+      ? createGeminiDownloader(partition)
+      : createChatGptDownloader(partition);
   }
 
   async wipePartition(partition: string): Promise<void> {
