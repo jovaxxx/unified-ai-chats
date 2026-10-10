@@ -1,6 +1,6 @@
 import { app, session } from 'electron';
 import { EndpointChanged, SessionExpired } from '../connectors/errors';
-import { isImageLink } from '../connectors/gemini/parse';
+import { isImageLink, isVideoLink } from '../connectors/gemini/parse';
 import {
   buildBatchBody,
   buildBatchUrl,
@@ -96,22 +96,25 @@ export function createGeminiRpc(partition: string): BatchRpc {
   };
 }
 
-const MAX_DOWNLOAD_BYTES = 40 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 40 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 150 * 1024 * 1024;
 
 /**
- * Downloads a picture from Gemini's own image host (`googleusercontent.com`), as the profile's session. Only https,
- * only that host, never more than 40 MB.
+ * Downloads a picture from Gemini's own image host (`googleusercontent.com`, at most 40 MB) or a video from Google's
+ * user-content download address (at most 150 MB), as the profile's session. Only https, only those hosts.
  */
 export function createGeminiDownloader(partition: string): DownloadUrl {
   const ses = session.fromPartition(partition);
   return async (url) => {
-    if (!isImageLink(url)) throw new Error('Download host not allowed.');
+    const video = isVideoLink(url);
+    if (!video && !isImageLink(url)) throw new Error('Download host not allowed.');
+    const max = video ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
     const res = await ses.fetch(url, { method: 'GET', credentials: 'include' });
     const declared = Number(res.headers.get('content-length'));
-    if (Number.isFinite(declared) && declared > MAX_DOWNLOAD_BYTES)
+    if (Number.isFinite(declared) && declared > max)
       throw new Error('The file is too large to download.');
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length > MAX_DOWNLOAD_BYTES) throw new Error('The file is too large to download.');
+    if (bytes.length > max) throw new Error('The file is too large to download.');
     return { status: res.status, bytes, mime: res.headers.get('content-type') };
   };
 }

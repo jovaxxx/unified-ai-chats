@@ -47,6 +47,27 @@ const KNOWN: { mime: string; ext: string; test: (b: Uint8Array) => boolean }[] =
  * What kind of image these bytes are, from their first bytes, NOT from what the server claims. A login page or an
  * error page saved as "image.png" is refused here. SVG is refused too: it can carry scripts.
  */
+/** What kind of video these bytes are, from their first bytes (MP4 or WebM). Anything else is refused. */
+export function sniffVideo(bytes: Uint8Array): { mime: string } | null {
+  if (
+    bytes.length > 12 &&
+    bytes[4] === 0x66 && // "ftyp"
+    bytes[5] === 0x74 &&
+    bytes[6] === 0x79 &&
+    bytes[7] === 0x70
+  )
+    return { mime: 'video/mp4' };
+  if (
+    bytes.length > 4 &&
+    bytes[0] === 0x1a &&
+    bytes[1] === 0x45 &&
+    bytes[2] === 0xdf &&
+    bytes[3] === 0xa3
+  )
+    return { mime: 'video/webm' };
+  return null;
+}
+
 export function sniffImage(bytes: Uint8Array): { mime: string; ext: string } | null {
   const hit = KNOWN.find((k) => k.test(bytes));
   return hit ? { mime: hit.mime, ext: hit.ext } : null;

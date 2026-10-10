@@ -888,3 +888,32 @@ describe('migration 11', () => {
     ]);
   });
 });
+
+describe('migration 12', () => {
+  it('makes only the Gemini chats that showed a video note be read once more', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    for (let i = 0; i < 11; i++) db.exec(migrations[i] as string);
+    db.exec('PRAGMA user_version = 11');
+    db.exec(`
+      INSERT INTO accounts (id, platform, label, partition, last_sync_at) VALUES (1, 'gemini', 'G', 'persist:gemini-a', '2026-10-10T10:00:00.000Z'), (2, 'gemini', 'H', 'persist:gemini-b', '2026-10-10T10:00:00.000Z');
+      INSERT INTO conversations (id, account_id, remote_id, remote_title, title, parse_version, created_at, updated_at, remote_updated_at)
+        VALUES (1, 1, 'a', 't', 't', 2, 'x', 'x', '2026-09-01T00:00:00.000Z'), (2, 1, 'b', 't', 't', 2, 'x', 'x', '2026-09-02T00:00:00.000Z'), (3, 2, 'c', 't', 't', 2, 'x', 'x', '2026-09-03T00:00:00.000Z');
+      INSERT INTO messages (conversation_id, role, content_json, created_at) VALUES
+        (1, 'assistant', '[{"type":"text","text":"(A video was generated here: open this chat on Gemini to watch it.)"}]', 'x'),
+        (2, 'assistant', '[{"type":"text","text":"plain"}]', 'x'),
+        (3, 'assistant', '[{"type":"text","text":"plain"}]', 'x');
+    `);
+    migrate(db);
+    expect(db.prepare('SELECT id, parse_version FROM conversations ORDER BY id').all()).toEqual([
+      { id: 1, parse_version: 0 },
+      { id: 2, parse_version: 2 },
+      { id: 3, parse_version: 2 },
+    ]);
+    // Only the profile with such a chat forgets its last sync, so the next run lists everything.
+    expect(db.prepare('SELECT id, last_sync_at FROM accounts ORDER BY id').all()).toEqual([
+      { id: 1, last_sync_at: null },
+      { id: 2, last_sync_at: '2026-10-10T10:00:00.000Z' },
+    ]);
+  });
+});

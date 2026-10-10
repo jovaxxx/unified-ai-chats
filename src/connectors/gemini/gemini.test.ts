@@ -8,6 +8,7 @@ import type { BatchRpc } from '../types';
 import { GeminiClient } from './client';
 import { createGeminiConnector } from './index';
 import { cleanTitle, findChats, findTurns, parseConversation, withoutPlaceholders } from './parse';
+import { sniffVideo } from '../../core/images';
 import {
   buildBatchBody,
   buildBatchUrl,
@@ -271,7 +272,6 @@ describe('long titles and pictures', () => {
     expect(out.videos).toBe(1);
     expect(out.text).not.toContain('googleusercontent');
     expect(out.text).toContain('Here you go!');
-    expect(out.text).toContain('open this chat on Gemini');
   });
 
   const withImages = (links: string[]) => {
@@ -344,6 +344,100 @@ describe('long titles and pictures', () => {
     );
     expect(chat.images).toBeUndefined();
     expect(chat.skipped).toEqual({ 'images:link-not-found': 1 }); // said, not hidden
+  });
+});
+
+describe('generated videos', () => {
+  const VIDEO =
+    'https://contribution.usercontent.google.com/download?c=SECRETTOKEN&filename=clip.mp4';
+  const STILL = 'https://lh3.googleusercontent.com/gg/StillImage123456';
+  const PLACEHOLDER =
+    'Here is your video!\n\nhttp://googleusercontent.com/generated_video_content/0';
+
+  /** The description of a video as the recorded report shows it: the links at position 7, "video/mp4" at 11. */
+  const description = (links: unknown[]) => {
+    const d: unknown[] = Array<null>(18).fill(null);
+    d[7] = links;
+    d[11] = 'video/mp4';
+    return d;
+  };
+  /** A turn whose answer carries a video, nested the way the report shows (a keyed object on the way). */
+  const withVideo = (links: unknown[]) => {
+    const t = turn(1, 0, 'Make a clip of a bee', PLACEHOLDER, T0);
+    (t[3] as unknown[][])[0]![0] = [
+      'rc_aaaaaaaa',
+      [PLACEHOLDER],
+      ...Array<null>(10).fill(null),
+      [{ '7': [[[description(links)]]], '0': 1 }],
+    ];
+    return t;
+  };
+
+  it('takes the file and the still from where the report shows them, and drops the dead link', () => {
+    const chat = parseConversation([[[withVideo([STILL, VIDEO, `${STILL}2`])]]], id(1));
+    const reply = chat.messages.find((m) => m.role === 'assistant')!;
+    expect(reply.blocks).toEqual([
+      { type: 'text', text: 'Here is your video!' },
+      { type: 'video', ref: `${VIDEO}#video`, poster: `${STILL}#poster` },
+    ]);
+    expect(chat.images).toEqual(
+      expect.arrayContaining([
+        { ref: `${VIDEO}#video`, kind: 'generated' },
+        { ref: `${STILL}#poster`, kind: 'generated' },
+      ]),
+    );
+    expect(chat.skipped).toBeUndefined();
+    expect(JSON.stringify(reply.blocks)).not.toContain('generated_video_content');
+  });
+
+  it('says so, in the chat, when the file was not found; a link from another place is never taken', () => {
+    for (const links of [
+      [STILL],
+      ['https://evil.example/video.mp4', 'http://contribution.usercontent.google.com/download?x=1'],
+    ]) {
+      const chat = parseConversation([[[withVideo(links)]]], id(1));
+      const reply = chat.messages.find((m) => m.role === 'assistant')!;
+      expect(reply.blocks.some((b) => b.type === 'video')).toBe(false);
+      expect(JSON.stringify(reply.blocks)).toContain('open this chat on Gemini');
+      expect(chat.skipped).toEqual({ 'videos:link-not-found': 1 });
+    }
+  });
+
+  it('downloads a video only from the user-content address, and a still only from the image host', async () => {
+    const c = createGeminiConnector();
+    const asked: string[] = [];
+    const ctx = {
+      accountId: 1,
+      downloadUrl: async (u: string) => {
+        asked.push(u);
+        return {
+          status: 200,
+          bytes: new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 1, 2, 3, 4, 5, 6]),
+          mime: 'video/mp4',
+        };
+      },
+    };
+    await c.downloadImage!(ctx, { ref: `${VIDEO}#video` }, id(1));
+    await c.downloadImage!(ctx, { ref: `${STILL}#poster` }, id(1));
+    expect(asked).toEqual([VIDEO, STILL]); // the mark is not sent
+    for (const bad of [
+      `${STILL}#video`, // an image address is not a video
+      `${VIDEO}#poster`, // a video address is not a still
+      'https://evil.example/a.mp4#video',
+      'http://contribution.usercontent.google.com/download?x=1#video',
+      'https://contribution.usercontent.google.com/other?x=1#video',
+    ])
+      await expect(c.downloadImage!(ctx, { ref: bad }, id(1))).rejects.toThrow(NotFound);
+    expect(asked).toHaveLength(2);
+  });
+
+  it('tells a video from anything else by its first bytes', () => {
+    expect(
+      sniffVideo(new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 1, 2, 3, 4, 5]))?.mime,
+    ).toBe('video/mp4');
+    expect(sniffVideo(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3]))?.mime).toBe('video/webm');
+    expect(sniffVideo(new TextEncoder().encode('<html>sign in</html>'))).toBeNull();
+    expect(sniffVideo(new Uint8Array(0))).toBeNull();
   });
 });
 
@@ -524,6 +618,54 @@ describe('Gemini in the local inbox', () => {
     expect(shown?.mime).toBe('image/png');
     expect(asked).toEqual([url]);
     expect(JSON.stringify(reply.blocks)).not.toContain('image_generation_content');
+  });
+
+  it('a generated video is kept out of the picture gallery, and plays from its link after a sync', async () => {
+    const c = setup();
+    const accountId = await profile(c);
+    const video = 'https://contribution.usercontent.google.com/download?c=TOKEN';
+    const still = 'https://lh3.googleusercontent.com/gg/StillImage123456';
+    const g = gemini({ chats: [{ n: 1, title: 'Bee clip', sec: T0, turns: 1 }] });
+    const plain = g.rpc;
+    c.web.setRpc(async (call) => {
+      const res = await plain(call);
+      if (call.rpcid !== 'hNvQHb') return res;
+      const text = 'Here is your video!\n\nhttp://googleusercontent.com/generated_video_content/0';
+      const t = turn(1, 0, 'A clip please', text, T0);
+      const d: unknown[] = Array<null>(18).fill(null);
+      d[7] = [still, video];
+      d[11] = 'video/mp4';
+      (t[3] as unknown[][])[0]![0] = [
+        'rc_aaaaaaaa',
+        [text],
+        ...Array<null>(10).fill(null),
+        [{ k: [[[d]]] }],
+      ];
+      return { status: 200, text: answer('hNvQHb', [[[t]]]) };
+    });
+    const mp4 = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 1, 2, 3, 4, 5, 6, 7, 8]);
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    const asked: string[] = [];
+    c.web.setDownload(async (u) => {
+      asked.push(u);
+      return u === video
+        ? { status: 200, bytes: mp4, mime: 'video/mp4' }
+        : { status: 200, bytes: png, mime: 'image/png' };
+    });
+
+    await c.api.syncProfiles([accountId]);
+    const chatId = c.repo.listChats({ accountId }).items[0]!.id;
+    const block = c.repo
+      .getChat(chatId)!
+      .messages.flatMap((m) => m.blocks)
+      .find((b) => b.type === 'video') as { mediaId?: number | null; posterId?: number | null };
+    expect(block.mediaId).toBeTruthy();
+    expect(block.posterId).toBeTruthy();
+    expect((await c.api.imageData(block.mediaId!))?.mime).toBe('video/mp4');
+    expect((await c.api.imageData(block.posterId!))?.mime).toBe('image/png');
+    expect(asked).toEqual([video, still]);
+    // Neither the clip nor its still is a picture of the gallery.
+    expect((await c.api.listImages({ accountId })).total).toBe(0);
   });
 
   it("downloads a picture only from Gemini's image host", async () => {

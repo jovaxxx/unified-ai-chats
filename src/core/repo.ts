@@ -174,7 +174,9 @@ export function toFtsQuery(input: string): string | null {
 }
 
 function blocksToText(blocks: ContentBlock[]): string {
-  return blocks.map((b) => (b.type === 'image' ? (b.alt ?? '') : b.text)).join('\n');
+  return blocks
+    .map((b) => (b.type === 'image' ? (b.alt ?? '') : b.type === 'video' ? '' : b.text))
+    .join('\n');
 }
 
 export class Repo {
@@ -1248,6 +1250,17 @@ export class Repo {
       ).map((m) => [m.ref, m]),
     );
     const withMedia = (b: ContentBlock): ContentBlock => {
+      if (b.type === 'video') {
+        // A video and its still are kept apart from pictures by a mark on their reference, so they stay out of the gallery.
+        const v = mediaByRef.get(b.ref);
+        const poster = b.poster ? mediaByRef.get(b.poster) : undefined;
+        return {
+          ...b,
+          mediaId: v && v.kind === 'generated' ? v.id : null,
+          posterId: poster && poster.kind === 'generated' ? poster.id : null,
+          status: v?.status ?? 'pending',
+        };
+      }
       if (b.type !== 'image') return b;
       const m = mediaByRef.get(b.ref);
       return {

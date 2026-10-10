@@ -30,7 +30,7 @@ import {
   type SyncStats,
 } from '../shared/types';
 import { ActionQueue, ActionRunner, type RunnerDeps } from './actions';
-import { downloadPendingImages, sniffImage, type MediaStore } from './images';
+import { downloadPendingImages, sniffImage, sniffVideo, type MediaStore } from './images';
 import { platformUrl } from './platforms';
 import type { Repo } from './repo';
 import { syncAccount } from './sync';
@@ -322,8 +322,9 @@ export function createApi(
           { ref: src.ref },
           src.conversationRemoteId,
         );
-        const kind = sniffImage(got.bytes);
-        if (!kind || got.bytes.length === 0) throw new Error('The file is not an image.');
+        const kind = src.ref.endsWith('#video') ? sniffVideo(got.bytes) : sniffImage(got.bytes);
+        if (!kind || got.bytes.length === 0)
+          throw new Error('The file is not an image or a video.');
         const img = { bytes: got.bytes, mime: kind.mime };
         remember(id, img);
         return img;

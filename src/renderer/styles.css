@@ -1650,6 +1650,42 @@ body.is-resizing webview {
   width: 100%;
   height: auto;
 }
+.chat-video-poster {
+  position: relative;
+  cursor: pointer;
+  min-height: 120px;
+}
+.chat-video-blank {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--panel);
+}
+.chat-video-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.chat-video-play .icon {
+  fill: currentColor;
+  width: 24px;
+  height: 24px;
+}
+.chat-video {
+  display: block;
+  margin: 4px 0 12px;
+  max-width: min(100%, 560px);
+  max-height: 420px;
+  border-radius: 12px;
+  background: #000;
+}
 .chat-image-missing {
   display: inline-flex;
   align-items: center;

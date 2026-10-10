@@ -7,7 +7,7 @@ import type {
   RemoteConversationSummary,
 } from '../types';
 import { GeminiClient } from './client';
-import { isImageLink, parseConversation } from './parse';
+import { isImageLink, isVideoLink, parseConversation, POSTER_MARK, VIDEO_MARK } from './parse';
 
 /** What a sync's listing learned about each chat: the title and the last change, which the chat itself lacks. */
 const listings = new WeakMap<AccountContext, Map<string, { title: string; updatedAt: string }>>();
@@ -69,16 +69,25 @@ export function createGeminiConnector(opts?: ClientOptions): Connector {
 
     notes: (ctx) => notesOf.get(ctx) ?? {},
 
-    /** Fetches one picture from Gemini's own image host, as this profile's session. */
+    /**
+     * Fetches one picture, a video's still or a video, as this profile's session. A picture or a still comes from
+     * Gemini's image host; a video from Google's user-content download address. Nothing else.
+     */
     async downloadImage(ctx, image) {
       if (!ctx.downloadUrl) throw new Error('The Gemini connector needs a way to download files.');
-      if (!isImageLink(image.ref))
+      const isVideo = image.ref.endsWith(VIDEO_MARK);
+      const url = image.ref.endsWith(VIDEO_MARK)
+        ? image.ref.slice(0, -VIDEO_MARK.length)
+        : image.ref.endsWith(POSTER_MARK)
+          ? image.ref.slice(0, -POSTER_MARK.length)
+          : image.ref;
+      if (!(isVideo ? isVideoLink(url) : isImageLink(url)))
         throw new NotFound('This image reference is not one this app knows how to fetch.');
-      const res = await ctx.downloadUrl(image.ref);
+      const res = await ctx.downloadUrl(url);
       if (res.status === 403 || res.status === 404 || res.status === 410) {
-        throw new NotFound(`The image file is gone (HTTP ${res.status}).`);
+        throw new NotFound(`The file is gone (HTTP ${res.status}).`);
       }
-      if (res.status !== 200) throw new Error(`Downloading an image answered HTTP ${res.status}.`);
+      if (res.status !== 200) throw new Error(`Downloading a file answered HTTP ${res.status}.`);
       return { bytes: res.bytes, mime: res.mime ?? '' };
     },
 

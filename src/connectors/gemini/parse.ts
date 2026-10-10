@@ -23,6 +23,8 @@ export interface Turn {
   assistant: string;
   /** Links to the images of the answer, in order, as Gemini's own image host gives them. */
   images: string[];
+  /** The generated videos of the answer: the file to play and the still to show before it plays. */
+  videos: { video: string; poster?: string }[];
 }
 
 const MAX_DEPTH = 14;
@@ -110,6 +112,7 @@ export function findTurns(payload: unknown): Turn[] {
       user: userText(a[2]),
       assistant: assistantText(a[3]),
       images: imageLinks(a[3]),
+      videos: videoLinks(a[3]),
     });
     return true;
   });
@@ -130,6 +133,53 @@ export function isImageLink(value: unknown): value is string {
   }
 }
 
+/** The only place a generated video can be downloaded from: Google's user-content download address. */
+export function isVideoLink(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 4000) return false;
+  try {
+    const u = new URL(value);
+    return (
+      u.protocol === 'https:' &&
+      u.hostname === 'contribution.usercontent.google.com' &&
+      u.pathname.startsWith('/download')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** The mark that keeps a video, and its still, apart from pictures in the database. */
+export const VIDEO_MARK = '#video';
+export const POSTER_MARK = '#poster';
+
+/**
+ * The videos of an answer. A video is described by a list whose position 11 says `video/…` and whose position 7 holds
+ * its links: the still(s) on Gemini's image host and the download address. From a structure report recorded on a real
+ * account (types and positions only): NOT yet run against a real video.
+ */
+function videoLinks(part: unknown): { video: string; poster?: string }[] {
+  const out: { video: string; poster?: string }[] = [];
+  let nodes = 0;
+  const go = (v: unknown, depth: number) => {
+    if (typeof v !== 'object' || v === null || depth > MAX_DEPTH || ++nodes > MAX_NODES) return;
+    if (Array.isArray(v)) {
+      const mime = v[11];
+      const links = v[7];
+      if (typeof mime === 'string' && /^video\//i.test(mime) && Array.isArray(links)) {
+        const video = links.find(isVideoLink);
+        const poster = links.find(isImageLink);
+        if (video && !out.some((o) => o.video === video))
+          out.push({ video, ...(poster ? { poster } : {}) });
+        return;
+      }
+    }
+    // Lists and keyed objects alike: the report shows a keyed object on the way to the description of a video.
+    for (const child of Array.isArray(v) ? v : Object.values(v)) go(child, depth + 1);
+  };
+  go(part, 0);
+  return out;
+}
+
 /**
  * The images of an answer. Each is described by a list with its link at position 3; when one list holds two such
  * descriptions (the picture and a second size of it, by the look of the report), only the first is taken.
@@ -137,10 +187,11 @@ export function isImageLink(value: unknown): value is string {
  */
 function imageLinks(part: unknown): string[] {
   const out: string[] = [];
+  let nodes = 0;
   const go = (v: unknown, depth: number) => {
-    if (!Array.isArray(v) || depth > MAX_DEPTH) return;
+    if (typeof v !== 'object' || v === null || depth > MAX_DEPTH || ++nodes > MAX_NODES) return;
     let taken = false;
-    for (const child of v) {
+    for (const child of Array.isArray(v) ? v : Object.values(v)) {
       if (Array.isArray(child) && isImageLink(child[3])) {
         if (!taken) {
           taken = true;
@@ -197,7 +248,7 @@ export function withoutPlaceholders(text: string): {
         return '';
       }
       videos++;
-      return VIDEO_NOTE;
+      return '';
     })
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -236,10 +287,21 @@ export function parseConversation(
       blocks.push({ type: 'image', ref });
       if (!images.has(ref)) images.set(ref, { ref, kind: 'generated' });
     }
+    for (const v of t.videos) {
+      const ref = `${v.video}${VIDEO_MARK}`;
+      const poster = v.poster ? `${v.poster}${POSTER_MARK}` : undefined;
+      blocks.push({ type: 'video', ref, ...(poster ? { poster } : {}) });
+      images.set(ref, { ref, kind: 'generated' });
+      if (poster) images.set(poster, { ref: poster, kind: 'generated' });
+    }
     // Pictures the text pointed at but whose links were not found: counted, never hidden.
     if (reply.images > t.images.length)
       skip('images:link-not-found', reply.images - t.images.length);
-    if (reply.videos > 0) skip('videos', reply.videos);
+    // A video the text pointed at but whose file was not found: said in the chat, counted, never hidden.
+    if (reply.videos > t.videos.length) {
+      skip('videos:link-not-found', reply.videos - t.videos.length);
+      blocks.splice(reply.text ? 1 : 0, 0, { type: 'text', text: VIDEO_NOTE });
+    }
     if (blocks.length > 0) messages.push({ role: 'assistant', blocks, createdAt: t.at });
   }
   const firstUser =

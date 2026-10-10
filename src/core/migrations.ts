@@ -205,4 +205,14 @@ export const migrations: string[] = [
    WHERE account_id IN (SELECT id FROM accounts WHERE platform = 'gemini');
   UPDATE accounts SET last_sync_at = NULL WHERE platform = 'gemini';
   `,
+  /* 12: Gemini chats that showed a note instead of a generated video are read once more, now that videos are kept.
+         Only those chats; everything else is left as it is. */
+  `
+  UPDATE conversations SET parse_version = 0, remote_updated_at = '1970-01-01T00:00:00.000Z'
+   WHERE account_id IN (SELECT id FROM accounts WHERE platform = 'gemini')
+     AND id IN (SELECT conversation_id FROM messages WHERE content_json LIKE '%A video was generated here%');
+  UPDATE accounts SET last_sync_at = NULL
+   WHERE platform = 'gemini'
+     AND id IN (SELECT account_id FROM conversations WHERE remote_updated_at = '1970-01-01T00:00:00.000Z');
+  `,
 ];

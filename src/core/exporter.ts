@@ -46,6 +46,7 @@ function markdownOf(
     for (const b of m.blocks) {
       if (b.type === 'text') out.push(b.text, '');
       else if (b.type === 'code') out.push('```' + b.lang, b.text, '```', '');
+      else if (b.type === 'video') out.push('_[video]_', '');
       else {
         const file = b.mediaId ? imageFile(b.mediaId) : null;
         out.push(

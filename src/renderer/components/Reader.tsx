@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ChatDetail, ContentBlock } from '../../shared/types';
 import { daysUntil, formatRelative } from '../format';
 import { Icon } from './Icon';
-import { Lightbox, StoredImage } from './Lightbox';
+import { Lightbox, mediaUrl, StoredImage } from './Lightbox';
 import { Markdown } from './Markdown';
 import { PlatformLogo } from './PlatformLogo';
 
@@ -326,6 +326,8 @@ export function Reader({
                   <span key={i}>{b.text}</span>
                 ) : b.type === 'image' ? (
                   <ChatImage key={i} block={b} onOpen={setViewing} />
+                ) : b.type === 'video' ? (
+                  <ChatVideo key={i} block={b} />
                 ) : (
                   <pre className="code" key={i}>
                     {b.text}
@@ -348,6 +350,8 @@ export function Reader({
                   />
                 ) : b.type === 'image' ? (
                   <ChatImage key={i} block={b} onOpen={setViewing} />
+                ) : b.type === 'video' ? (
+                  <ChatVideo key={i} block={b} />
                 ) : (
                   <pre className="code" key={i}>
                     <code>{b.text}</code>
@@ -423,5 +427,54 @@ function ChatImage({
       <Icon name="image" size="sm" />
       {t(`images.${reason}`)}
     </span>
+  );
+}
+
+type VideoBlock = Extract<ContentBlock, { type: 'video' }>;
+
+/**
+ * A generated video: its still with a play button, and the player once it is clicked. The app fetches the file only
+ * then, and keeps it in memory. If it cannot be played, a note says to watch it on the platform.
+ */
+function ChatVideo({ block }: { block: VideoBlock }) {
+  const { t } = useTranslation();
+  const [playing, setPlaying] = useState(false);
+  const [failed, setFailed] = useState(false);
+  if (!block.mediaId || failed) {
+    return (
+      <span className="chat-image-missing">
+        <Icon name="play" size="sm" />
+        {t('video.missing')}
+      </span>
+    );
+  }
+  if (playing) {
+    return (
+      <video
+        className="chat-video"
+        controls
+        autoPlay
+        src={mediaUrl(block.mediaId)}
+        aria-label={t('video.label')}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="chat-image chat-video-poster"
+      aria-label={t('video.play')}
+      onClick={() => setPlaying(true)}
+    >
+      {block.posterId ? (
+        <StoredImage id={block.posterId} alt="" thumb />
+      ) : (
+        <span className="chat-video-blank" />
+      )}
+      <span className="chat-video-play" aria-hidden="true">
+        <Icon name="play" />
+      </span>
+    </button>
   );
 }

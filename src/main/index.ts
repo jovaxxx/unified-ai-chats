@@ -16,12 +16,16 @@ import { createApi } from '../core/api';
 import { openDatabase } from '../core/db';
 import { Repo } from '../core/repo';
 import { IPC_CHANNELS, type Api } from '../shared/api';
+import { parseRange } from '../shared/range';
 import { createFileMediaStore } from './media';
 import { ElectronWebHost } from './web';
 
 // Downloaded images are shown through this scheme, never by file path (see the handler below).
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'uac-media', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  {
+    scheme: 'uac-media',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+  },
 ]);
 
 // One data folder whether the app runs from the installer or from source, so upgrading (or switching) keeps everything:
@@ -152,12 +156,22 @@ void app.whenReady().then(() => {
         : url.hostname === 't'
           ? await thumbData(id)
           : null;
-    if (!img || !/^image\/(png|jpeg|gif|webp)$/.test(img.mime)) {
+    if (!img || !/^(image\/(png|jpeg|gif|webp)|video\/(mp4|webm))$/.test(img.mime)) {
       return new Response('Not found', { status: 404 });
     }
-    return new Response(Buffer.from(img.bytes), {
+    const size = img.bytes.length;
+    const range = parseRange(request.headers.get('range'), size);
+    if (range === 'invalid') {
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+    }
+    const part = range ? img.bytes.subarray(range.start, range.end + 1) : img.bytes;
+    return new Response(Buffer.from(part), {
+      status: range ? 206 : 200,
       headers: {
         'Content-Type': img.mime,
+        'Content-Length': String(part.length),
+        'Accept-Ranges': 'bytes',
+        ...(range ? { 'Content-Range': `bytes ${range.start}-${range.end}/${size}` } : {}),
         'X-Content-Type-Options': 'nosniff',
         'Cache-Control':
           url.hostname === 't' ? 'private, max-age=31536000' : 'private, max-age=600',
@@ -221,7 +235,7 @@ void app.whenReady().then(() => {
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self'; img-src 'self' data: uac-media:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+            "default-src 'self'; img-src 'self' data: uac-media:; media-src 'self' uac-media:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
           ],
         },
       });

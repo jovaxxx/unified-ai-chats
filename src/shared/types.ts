@@ -16,7 +16,19 @@ export type ContentBlock =
    * An image in the conversation. `ref` is the source's own pointer. `mediaId` and `status` are filled in when the chat
    * is read (never stored): `done` means the file is on this Mac.
    */
-  | { type: 'image'; ref: string; alt?: string; mediaId?: number | null; status?: MediaStatus };
+  | { type: 'image'; ref: string; alt?: string; mediaId?: number | null; status?: MediaStatus }
+  /**
+   * A video in the conversation (a generated clip). `ref` is the video's own pointer, `poster` the still shown before it
+   * plays. `mediaId` / `posterId` and `status` are filled in when the chat is read, like for an image.
+   */
+  | {
+      type: 'video';
+      ref: string;
+      poster?: string;
+      mediaId?: number | null;
+      posterId?: number | null;
+      status?: MediaStatus;
+    };
 
 export type MediaStatus = 'pending' | 'done' | 'failed' | 'skipped';
 

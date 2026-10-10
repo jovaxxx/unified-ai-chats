@@ -298,6 +298,11 @@
     "queued_one": "{{count}} chat è in coda per essere eliminata sulla piattaforma. Prima viene salvata una copia completa.",
     "queued_other": "{{count}} chat sono in coda per essere eliminate sulla piattaforma. Prima viene salvata una copia completa di ciascuna."
   },
+  "video": {
+    "play": "Riproduci il video",
+    "label": "Video generato",
+    "missing": "Il video non si può mostrare qui. Apri la chat sulla piattaforma per guardarlo."
+  },
   "images": {
     "title": "Immagini generate",
     "count_one": "{{count}} immagine",

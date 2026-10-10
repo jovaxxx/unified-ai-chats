@@ -298,6 +298,11 @@
     "queued_one": "{{count}} chat is queued for deletion on the platform. A full copy is saved first.",
     "queued_other": "{{count}} chats are queued for deletion on the platform. A full copy of each is saved first."
   },
+  "video": {
+    "play": "Play video",
+    "label": "Generated video",
+    "missing": "The video cannot be shown here. Open the chat on the platform to watch it."
+  },
   "images": {
     "title": "Generated images",
     "count_one": "{{count}} image",
