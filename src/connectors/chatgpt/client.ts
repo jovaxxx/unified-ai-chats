@@ -3,6 +3,8 @@ import { EndpointChanged, NotFound, RateLimited, SessionExpired } from '../error
 import type { HttpJson } from '../types';
 import {
   conversationDetailSchema,
+  conversationFlatSchema,
+  flatToDetail,
   conversationPageSchema,
   fileDownloadSchema,
   pinsSchema,
@@ -155,15 +157,17 @@ export class ChatGptClient {
   async *conversations(
     archived: boolean,
     stopWhen?: (item: ConversationItem) => boolean,
+    /** `'tpp'`: the chats the site lists apart ("work" chats), which the ordinary list leaves out. */
+    origin?: 'tpp',
   ): AsyncGenerator<ConversationItem> {
     for (let page = 0; page < MAX_PAGES; page++) {
       const offset = page * PAGE_SIZE;
       const res = await this.get(
-        `/backend-api/conversations?offset=${offset}&limit=${PAGE_SIZE}&order=updated&is_archived=${archived}`,
+        `/backend-api/conversations?offset=${offset}&limit=${PAGE_SIZE}&order=updated&is_archived=${archived}${origin ? `&conversation_origin=${origin}` : ''}`,
         conversationPageSchema,
       );
       // What the first page said, noted BEFORE reading it, so it is known even when the list is cut short.
-      if (offset === 0) {
+      if (offset === 0 && !origin) {
         const newest = res.items.reduce((m, i) => Math.max(m, Date.parse(i.update_time) || 0), 0);
         const origins: Record<string, number> = {};
         for (const item of res.items) {
@@ -230,6 +234,23 @@ export class ChatGptClient {
     if (res.status && res.status !== 'success')
       throw new NotFound('The image is no longer available.');
     return res.download_url;
+  }
+
+  /**
+   * A chat read the way the site reads its work chats: `GET /backend-api/conversations/<id>`, a flat list of messages.
+   * Asked for a large number of turns first; if the site does not take that, without. If it says there are earlier turns
+   * it did not return, the result says so (`maybeMore`). NOT confirmed which parameter asks for the earlier ones.
+   */
+  async workConversation(id: string): Promise<{ detail: ConversationDetail; maybeMore: boolean }> {
+    const path = `/backend-api/conversations/${encodeURIComponent(id)}`;
+    let flat;
+    try {
+      flat = await this.get(`${path}?num_turns=100`, conversationFlatSchema);
+    } catch (err) {
+      if (!(err instanceof EndpointChanged)) throw err;
+      flat = await this.get(path, conversationFlatSchema);
+    }
+    return { detail: flatToDetail(flat), maybeMore: flat.page_info?.has_previous_page === true };
   }
 
   async conversation(id: string): Promise<ConversationDetail> {

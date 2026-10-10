@@ -92,10 +92,15 @@ function server(opts: {
   projects?: { id: string; name: string }[];
   /** What GET /backend-api/pins answers: pinned chats and pinned projects. */
   pins?: { chats?: string[]; projects?: { id: string; name: string }[] };
+  /** The chats the site lists apart ("work", `conversation_origin=tpp`): only that list has them, and the site reads them flat. */
+  work?: Chat[];
+  /** Whether the flat read says there are earlier turns it did not return. */
+  workMoreTurns?: boolean;
 }) {
   const calls: string[] = [];
   const failures = new Map<string, HttpResult[]>();
   const detailCalls: string[] = [];
+  const flatCalls: string[] = [];
   const byNewest = (list: Chat[]) => [...list].sort((a, b) => b.update.localeCompare(a.update));
   const item = (c: Chat) => ({
     id: c.id,
@@ -123,11 +128,40 @@ function server(opts: {
         },
       };
     }
+    const flat = /^\/backend-api\/conversations\/([^/]+)$/.exec(p);
+    if (flat) {
+      flatCalls.push(path);
+      const c = (opts.work ?? []).find((x) => x.id === flat[1]);
+      if (!c) return { status: 404, json: { detail: 'Not found' } };
+      const turns = c.turns ?? [
+        { role: 'user' as const, text: `Question in ${c.title}` },
+        { role: 'assistant' as const, text: `Answer in ${c.title}` },
+      ];
+      const d = detailOf(c.id, c.title, turns, { update_time: Date.parse(c.update) / 1000 });
+      const messages = Object.values(d.mapping as Record<string, { id: string; message: unknown }>)
+        .filter((n) => n.message)
+        .map((n) => ({ id: n.id, ...(n.message as object) }));
+      return {
+        status: 200,
+        json: {
+          title: c.title,
+          create_time: d.create_time,
+          update_time: d.update_time,
+          conversation_id: c.id,
+          gizmo_id: null,
+          is_archived: !!c.archived,
+          messages,
+          page_info: { has_previous_page: !!opts.workMoreTurns, has_next_page: false },
+        },
+      };
+    }
     if (p === '/backend-api/conversations') {
       const archived = url.searchParams.get('is_archived') === 'true';
       const offset = Number(url.searchParams.get('offset'));
       const limit = Number(url.searchParams.get('limit'));
-      const all = byNewest(opts.chats.filter((c) => !!c.archived === archived));
+      const pool =
+        url.searchParams.get('conversation_origin') === 'tpp' ? (opts.work ?? []) : opts.chats;
+      const all = byNewest(pool.filter((c) => !!c.archived === archived));
       return {
         status: 200,
         json: {
@@ -199,6 +233,7 @@ function server(opts: {
     http,
     calls,
     detailCalls,
+    flatCalls,
     failWith: (prefix: string, ...results: HttpResult[]) => failures.set(prefix, results),
   };
 }
@@ -576,6 +611,74 @@ describe('ChatGPT connector', () => {
           p.startsWith('/backend-api/conversations?is_archived=false') || p.includes('offset=28'),
       ),
     ).toHaveLength(0); // did not page further
+  });
+
+  describe('work chats (the list the site keeps apart)', () => {
+    const work = (n: number, title: string): Chat => ({
+      id: uuid(n),
+      title,
+      update: '2026-09-21T09:00:00Z',
+    });
+
+    it('are listed too, once each, read the way the site reads them, and said in the notes', async () => {
+      const s = server({ chats: chats(3), work: [work(90, 'Work one'), work(91, 'Work two')] });
+      const c = createChatGptConnector({ sleep: noSleep });
+      const x = ctx(s.http);
+      const ids = await list(c, x);
+      expect(ids).toEqual(expect.arrayContaining([uuid(90), uuid(91), uuid(1), uuid(2), uuid(3)]));
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(c.notes!(x)).toMatchObject({ work: 2 });
+      // The ordinary list is asked as before; the work list carries the origin the site uses.
+      expect(
+        s.calls.some(
+          (p) => p.includes('conversation_origin=tpp&') || p.endsWith('conversation_origin=tpp'),
+        ),
+      ).toBe(true);
+      expect(
+        s.calls
+          .filter((p) => !p.includes('conversation_origin'))
+          .some((p) => p.startsWith('/backend-api/conversations?')),
+      ).toBe(true);
+
+      const chat = await c.getConversation(x, uuid(90));
+      expect(chat.remoteTitle).toBe('Work one');
+      expect(chat.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+      expect(s.flatCalls).toHaveLength(1);
+      expect(s.flatCalls[0]).toContain('num_turns=100');
+      expect(chat.skipped).toBeUndefined();
+    });
+
+    it('say so when the site did not return the earlier turns', async () => {
+      const s = server({ chats: [], work: [work(90, 'Long work chat')], workMoreTurns: true });
+      const c = createChatGptConnector({ sleep: noSleep });
+      const x = ctx(s.http);
+      await list(c, x);
+      expect((await c.getConversation(x, uuid(90))).skipped).toEqual({ 'turns:maybe-more': 1 });
+    });
+
+    it('never stop the rest of the sync when their list cannot be read', async () => {
+      const s = server({ chats: chats(2), work: [work(90, 'Work one')] });
+      const broken = { status: 500, json: undefined } as const;
+      s.failWith(
+        '/backend-api/conversations?offset=0&limit=28&order=updated&is_archived=false&conversation_origin=tpp',
+        ...Array.from({ length: 8 }, () => broken),
+      );
+      const c = createChatGptConnector({ sleep: noSleep });
+      const x = ctx(s.http);
+      const ids = await list(c, x);
+      expect(ids).toEqual(expect.arrayContaining([uuid(1), uuid(2)]));
+      expect(c.notes!(x)).toMatchObject({ workListFailed: 1 });
+    });
+
+    it('a signed-out session still stops the sync', async () => {
+      const s = server({ chats: chats(1), work: [work(90, 'Work one')] });
+      s.failWith(
+        '/backend-api/conversations?offset=0&limit=28&order=updated&is_archived=false&conversation_origin=tpp',
+        { status: 401, json: undefined },
+      );
+      const c = createChatGptConnector({ sleep: noSleep });
+      await expect(list(c, ctx(s.http))).rejects.toThrow(SessionExpired);
+    });
   });
 
   it('notes what the first page of the list held, even when an incremental run cuts the list short', async () => {

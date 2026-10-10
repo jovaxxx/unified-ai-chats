@@ -1,4 +1,4 @@
-import { NotFound, SessionExpired } from '../errors';
+import { EndpointChanged, NotFound, SessionExpired } from '../errors';
 import type {
   AccountContext,
   Connector,
@@ -12,6 +12,8 @@ import { parseConversation } from './parse';
 const projectNames = new WeakMap<AccountContext, Map<string, string>>();
 /** Counts about the last listing (numbers only), so a gap between what ChatGPT says and what was read shows. */
 const listingNotes = new WeakMap<AccountContext, Record<string, number>>();
+/** The chats that came from the list the site keeps apart ("work"): they are read the way the site reads them. */
+const workChats = new WeakMap<AccountContext, Set<string>>();
 
 function clientFor(ctx: AccountContext, opts: ClientOptions | undefined): ChatGptClient {
   if (!ctx.http) throw new Error('The ChatGPT connector needs a signed-in session.');
@@ -124,6 +126,28 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
           yield summary(item.id, item.update_time);
         }
       }
+      // The list the site keeps apart for "work" chats; the ordinary list leaves them out. A failure here never stops
+      // the rest of the sync.
+      const work = new Set<string>();
+      workChats.set(ctx, work);
+      try {
+        for (const archived of [false, true]) {
+          for await (const item of client.conversations(
+            archived,
+            (i) => !fresh(i.update_time),
+            'tpp',
+          )) {
+            work.add(item.id);
+            if (seen.has(item.id)) continue;
+            seen.add(item.id);
+            notes.work = (notes.work ?? 0) + 1;
+            yield summary(item.id, item.update_time);
+          }
+        }
+      } catch (err) {
+        if (err instanceof SessionExpired) throw err;
+        notes.workListFailed = 1;
+      }
       notes.found = seen.size;
       notes.listTotal = client.listTotal ?? 0;
       // Numbers only: how many chats each first page held, when the newest changed, and what a run counts as new.
@@ -180,9 +204,32 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
     },
 
     async getConversation(ctx, remoteId): Promise<RemoteConversation> {
-      const detail = await clientFor(ctx, opts).conversation(remoteId);
+      const client = clientFor(ctx, opts);
       const names = projectNames.get(ctx);
-      return parseConversation(detail, remoteId, (id) => names?.get(id));
+      const asWork = async () => {
+        const { detail, maybeMore } = await client.workConversation(remoteId);
+        const parsed = parseConversation(detail, remoteId, (id) => names?.get(id));
+        return maybeMore
+          ? { ...parsed, skipped: { ...parsed.skipped, 'turns:maybe-more': 1 } }
+          : parsed;
+      };
+      const asOrdinary = async () =>
+        parseConversation(await client.conversation(remoteId), remoteId, (id) => names?.get(id));
+      // A work chat is read the way the site reads it; the old way is the fallback, and the other way round.
+      const first = workChats.get(ctx)?.has(remoteId) ? asWork : asOrdinary;
+      const second = first === asWork ? asOrdinary : asWork;
+      try {
+        return await first();
+      } catch (err) {
+        if (!(err instanceof NotFound) && !(err instanceof EndpointChanged)) throw err;
+        try {
+          return await second();
+        } catch (again) {
+          // The way that was tried first is the one worth reporting when neither works.
+          if (again instanceof NotFound || again instanceof EndpointChanged) throw err;
+          throw again;
+        }
+      }
     },
   };
 }
