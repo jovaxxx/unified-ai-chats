@@ -1,3 +1,4 @@
+import { batchRequestShape, batchResponseShape, isBatchExecute, rpcLabel } from './batchexecute';
 import {
   describeQuery,
   mergeShapes,
@@ -53,6 +54,8 @@ interface Pending {
   hasAuth: boolean;
   hasCookie: boolean;
   requestBodyShape?: Shape;
+  /** Google batchexecute calls: the method ids, which tell the calls on that one address apart. */
+  batch?: string;
   status?: number;
   mime?: string;
 }
@@ -66,6 +69,7 @@ export type BodyFetcher = (
 const SKIPPED_PATH = /\/(sentinel|cdn-cgi|ces|awe)\//;
 const MAX_PENDING = 500;
 const MAX_ENDPOINTS = 300;
+const MAX_BATCH_BODY = 8_000_000;
 
 function headerFlags(headers: Record<string, unknown> | undefined) {
   const names = new Set<string>();
@@ -135,7 +139,11 @@ export class StructureRecorder {
           hasAuth: flags.hasAuth,
           hasCookie: flags.hasCookie,
         };
-        if (typeof req.postData === 'string') {
+        if (isBatchExecute(url.pathname)) {
+          entry.batch = rpcLabel(url.searchParams) ?? 'unknown';
+          if (typeof req.postData === 'string')
+            entry.requestBodyShape = batchRequestShape(req.postData) ?? 'non-json';
+        } else if (typeof req.postData === 'string') {
           const json = tryJson(req.postData);
           entry.requestBodyShape = json === undefined ? 'non-json' : shapeOf(json);
         }
@@ -169,7 +177,15 @@ export class StructureRecorder {
         if (!p) return;
         this.pending.delete(id);
         let responseShape: Shape | undefined;
-        if (p.mime?.includes('json')) {
+        if (p.batch !== undefined) {
+          const raw = await getBody(id).catch(() => null);
+          if (raw && raw.body.length <= MAX_BATCH_BODY) {
+            const text = raw.base64Encoded
+              ? Buffer.from(raw.body, 'base64').toString('utf8')
+              : raw.body;
+            responseShape = batchResponseShape(text) ?? 'non-json';
+          }
+        } else if (p.mime?.includes('json')) {
           const raw = await getBody(id).catch(() => null);
           if (raw) {
             const text = raw.base64Encoded
@@ -194,7 +210,7 @@ export class StructureRecorder {
 
   private record(p: Pending, responseShape: Shape | undefined): void {
     this.total++;
-    const path = normalizePath(p.url.pathname);
+    const path = normalizePath(p.url.pathname) + (p.batch !== undefined ? `#${p.batch}` : '');
     const key = `${p.method} ${p.url.hostname}${path}`;
     let e = this.endpoints.get(key);
     if (!e) {

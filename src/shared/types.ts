@@ -230,7 +230,7 @@ export interface DashboardData {
 }
 
 /** Web platforms whose sign-in window (and structure recorder) exist today. */
-export const WEB_PLATFORMS = ['chatgpt', 'claude'] as const satisfies readonly Platform[];
+export const WEB_PLATFORMS = ['chatgpt', 'claude', 'gemini'] as const satisfies readonly Platform[];
 export type WebPlatform = (typeof WEB_PLATFORMS)[number];
 
 export interface RecorderStatus {

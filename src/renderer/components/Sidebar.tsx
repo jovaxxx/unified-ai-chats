@@ -35,7 +35,6 @@ interface Props {
 
 const NEW_CHAT_PLATFORMS: Platform[] = ['chatgpt', 'claude', 'gemini'];
 /** Web platforms whose connector does not exist yet. */
-const SOON: Platform[] = ['gemini'];
 
 export function Sidebar({
   data,
@@ -529,20 +528,21 @@ export function Sidebar({
                 {t('platforms.claude')}
                 {isFull('claude') && <span className="count">{t('nav.connected')}</span>}
               </button>
-              {SOON.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  role="menuitem"
-                  className="menu-item"
-                  disabled
-                  title={t('nav.addAccountSoon')}
-                >
-                  <PlatformLogo platform={p} />
-                  {t(`platforms.${p}`)}
-                  <span className="count">{t('nav.comingSoon')}</span>
-                </button>
-              ))}
+              <button
+                type="button"
+                role="menuitem"
+                className="menu-item"
+                disabled={isFull('gemini')}
+                title={isFull('gemini') ? t('nav.onePerPlatform') : undefined}
+                onClick={() => {
+                  setAddOpen(false);
+                  onAddProfile('gemini');
+                }}
+              >
+                <PlatformLogo platform="gemini" />
+                {t('platforms.gemini')}
+                {isFull('gemini') && <span className="count">{t('nav.connected')}</span>}
+              </button>
             </div>
           )}
         </div>

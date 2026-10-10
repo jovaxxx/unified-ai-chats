@@ -14,9 +14,14 @@ import { StructureRecorder } from '../tools/recorder';
 const RECORD_HOSTS: Partial<Record<Platform, string[]>> = {
   chatgpt: ['chatgpt.com', 'chat.openai.com'],
   claude: ['claude.ai'],
+  gemini: ['gemini.google.com'],
 };
 
-const PLATFORM_NAME: Partial<Record<Platform, string>> = { chatgpt: 'ChatGPT', claude: 'Claude' };
+const PLATFORM_NAME: Partial<Record<Platform, string>> = {
+  chatgpt: 'ChatGPT',
+  claude: 'Claude',
+  gemini: 'Gemini',
+};
 
 /**
  * How to learn WHICH account is signed in, using the platform's own page from inside its window (so the
@@ -57,6 +62,9 @@ const IDENTITY_PROBE: Partial<Record<Platform, { hosts: string[]; script: string
       })
       .catch(() => null)`,
   },
+  // Gemini does not hand out an account id in a call this app knows. No guess is made: the window reports nobody, and
+  // the user's own "I've signed in" (on gemini.google.com, past the Google sign-in pages) is what counts.
+  gemini: { hosts: ['gemini.google.com'], script: 'Promise.resolve(null)' },
 };
 
 interface Attempt {
@@ -211,6 +219,8 @@ export class ElectronWebHost implements WebHost {
   httpFor(partition: string): HttpJson {
     let h = this.http.get(partition);
     if (!h) {
+      if (partition.startsWith('persist:gemini-'))
+        throw new Error('Reading Gemini is not built yet.'); // never send a Gemini session through another site's code
       h = partition.startsWith('persist:claude-')
         ? createClaudeHttp(partition)
         : createChatGptHttp(partition);

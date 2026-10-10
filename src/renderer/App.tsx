@@ -428,6 +428,8 @@ export function App() {
     });
     setVersion((v) => v + 1);
     // The first import starts by itself: nobody should have to press Sync after signing in.
+    // (Only for platforms that can be read: Gemini cannot be synced yet.)
+    if (platform === 'gemini') return;
     const ids = [r.accountId];
     void runSync(ids, () => api.syncProfiles(ids));
   };

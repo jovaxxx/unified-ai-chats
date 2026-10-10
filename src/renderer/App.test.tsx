@@ -543,7 +543,7 @@ describe('ChatGPT structure recorder', () => {
     expect(within(dash).getByRole('button', { name: 'Sync now' })).toBeEnabled(); // a real profile now
   });
 
-  it('needs a selected profile for the recorder; the Add account menu lists Claude', async () => {
+  it('needs a selected profile for the recorder; the Add account menu lists Claude and Gemini', async () => {
     const web = fakeWeb();
     await profile(web);
     const user = userEvent.setup();
@@ -553,7 +553,7 @@ describe('ChatGPT structure recorder', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add account' }));
     expect(screen.getByRole('menuitem', { name: 'Claude' })).toBeEnabled();
-    expect(screen.getByRole('menuitem', { name: /Gemini.*Coming soon/ })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'Gemini' })).toBeEnabled();
   });
 });
 

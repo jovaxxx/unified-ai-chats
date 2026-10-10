@@ -204,6 +204,22 @@ describe('adding a web account: sign in first, then decide', () => {
     expect(ok.created).toBe(true);
   });
 
+  it('Gemini has a sign-in window too; Google does not say who signed in, so the user says so', async () => {
+    const c = setup();
+    c.signedInAs(null);
+    c.onlyAfterUserSaysSo();
+    const { attemptId } = await c.api.signInStart('gemini');
+    expect(await c.api.signInStatus(attemptId)).toEqual({ state: 'waiting' });
+    expect(await c.api.signInStatus(attemptId, true)).toMatchObject({
+      state: 'signed-in',
+      identityKnown: false,
+    });
+    const made = await c.api.signInFinish(attemptId, { type: 'new', label: 'Personal' });
+    expect(made.created).toBe(true);
+    expect(c.repo.getAccount(made.accountId)).toMatchObject({ platform: 'gemini' });
+    expect(c.repo.getAccount(made.accountId)!.partition).toMatch(/^persist:gemini-/);
+  });
+
   it('closing the window or cancelling wipes the session it created', async () => {
     const c = setup();
     const a = await c.api.signInStart('chatgpt');
@@ -220,7 +236,6 @@ describe('adding a web account: sign in first, then decide', () => {
 
   it('only web platforms with a sign-in window, and the session name is never the caller’s', async () => {
     const c = setup();
-    await expect(c.api.signInStart('gemini')).rejects.toThrow(); // Gemini has no sign-in window
     await expect(c.api.signInStart('claude-code')).rejects.toThrow();
     await expect(c.api.signInStatus('made-up-id')).rejects.toThrow(/no longer active/);
     await expect(c.api.signInStatus('')).rejects.toThrow();

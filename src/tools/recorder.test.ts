@@ -344,3 +344,112 @@ describe('StructureRecorder (Chrome DevTools Protocol events)', () => {
     expect(has(r, 'hello')).toBe(false);
   });
 });
+
+describe('Google batchexecute calls (Gemini)', () => {
+  const URL_ =
+    'https://gemini.google.com/_/BardChatUi/data/batchexecute?rpcids=MaZiqc&source-path=%2Fapp%2Fc_9f8e7d6c5b4a&bl=boq_x&hl=en';
+  const argsText = JSON.stringify([13, null, [0, null, 1]]);
+  const form =
+    'f.req=' +
+    encodeURIComponent(JSON.stringify([[['MaZiqc', argsText, null, 'generic']]])) +
+    '&at=SECRET_CSRF_TOKEN_VALUE&';
+  const payload = JSON.stringify([
+    null,
+    null,
+    [
+      ['c_9f8e7d6c5b4a', 'My private tax return question', null, [1712345678, 123456000]],
+      ['c_1a2b3c4d5e6f', 'Dear Mario, about the Rossi contract', null, [1712345679, 5]],
+      ['c_aaaa1111bbbb', 'Confidential client name Bluewave', null, [1712345680, 7]],
+      ['c_cccc2222dddd', 'another private title', null, [1712345681, 9]],
+    ],
+  ]);
+  const answer =
+    ")]}'\n\n" +
+    '300\n' +
+    JSON.stringify([
+      ['wrb.fr', 'MaZiqc', payload, null, null, null, 'generic'],
+      ['di', 42],
+    ]) +
+    '\n25\n[["e",4,null,null,138]]';
+
+  const feed = async (r: StructureRecorder) => {
+    await r.onEvent(
+      'Network.requestWillBeSent',
+      {
+        requestId: '1',
+        type: 'XHR',
+        request: { url: URL_, method: 'POST', headers: {}, postData: form },
+      },
+      async () => null,
+    );
+    await r.onEvent(
+      'Network.responseReceived',
+      { requestId: '1', response: { status: 200, mimeType: 'application/json' } },
+      async () => null,
+    );
+    await r.onEvent('Network.loadingFinished', { requestId: '1' }, async () => ({
+      body: answer,
+      base64Encoded: false,
+    }));
+  };
+
+  it('tells the calls apart by method id and describes arguments and answers by position, types only', async () => {
+    const r = new StructureRecorder({ allowedHosts: ['gemini.google.com'] });
+    await feed(r);
+    const report = r.report();
+    const e = report.endpoints[0]!;
+    expect(e.path).toBe('/_/BardChatUi/data/batchexecute#MaZiqc');
+    expect(e.query.rpcids).toBe('MaZiqc');
+    expect(e.requestBodyShape).toMatchObject({
+      MaZiqc: {
+        $tuple: { '0': 'number:int', '1': 'null', '2': { $tuple: { '0': 'number:int' } } },
+      },
+    });
+    const answerShape = JSON.stringify(e.responseShape);
+    expect(answerShape).toContain('"$list"'); // the list of chats
+    expect(answerShape).toContain('string:id(c_)'); // the chat id keeps only its format
+    expect(answerShape).toContain('string:medium'); // titles keep only a size
+    expect(answerShape).toContain('number:unix-seconds');
+  });
+
+  it('keeps no value from the call, the answer, the address or the form', async () => {
+    const r = new StructureRecorder({ allowedHosts: ['gemini.google.com'] });
+    await feed(r);
+    const text = JSON.stringify(r.report());
+    for (const secret of [
+      'SECRET_CSRF_TOKEN_VALUE',
+      'My private tax return question',
+      'Dear Mario',
+      'Bluewave',
+      'c_9f8e7d6c5b4a',
+      '1712345678',
+      'boq_x',
+    ])
+      expect(text).not.toContain(secret);
+  });
+
+  it('a body that is not what was expected is reported as non-json, not guessed at', async () => {
+    const r = new StructureRecorder({ allowedHosts: ['gemini.google.com'] });
+    await r.onEvent(
+      'Network.requestWillBeSent',
+      {
+        requestId: '2',
+        type: 'XHR',
+        request: { url: URL_, method: 'POST', headers: {}, postData: 'something=else' },
+      },
+      async () => null,
+    );
+    await r.onEvent(
+      'Network.responseReceived',
+      { requestId: '2', response: { status: 200, mimeType: 'text/plain' } },
+      async () => null,
+    );
+    await r.onEvent('Network.loadingFinished', { requestId: '2' }, async () => ({
+      body: 'not the usual format',
+      base64Encoded: false,
+    }));
+    const e = r.report().endpoints[0]!;
+    expect(e.requestBodyShape).toBe('non-json');
+    expect(e.responseShape).toBe('non-json');
+  });
+});
