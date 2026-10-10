@@ -929,23 +929,23 @@ describe('generated images', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Image' })).toBeNull());
   });
 
-  it('the sidebar has an Images folder per profile and a general one, with counts', async () => {
+  it('the sidebar has a Media folder per profile and a general one, with counts', async () => {
     addImageChat();
     const user = await renderApp();
     const nav = screen.getByRole('navigation', { name: 'Main views' });
-    expect(within(nav).getByRole('button', { name: /Images/ })).toHaveTextContent('2');
+    expect(within(nav).getByRole('button', { name: /Media/ })).toHaveTextContent('2');
     await user.click(screen.getByRole('button', { name: 'ChatGPT Acme Store' }));
-    // Two entries are called Images: the general one above and this profile's folder in the tree.
+    // Two entries are called Media: the general one above and this profile's folder in the tree.
     const folder = await waitFor(() => {
       const f = screen
-        .getAllByRole('button', { name: /^Images2$/ })
+        .getAllByRole('button', { name: /^Media2$/ })
         .find((b) => b.className.includes('tree-item'));
       expect(f).toBeTruthy();
       return f!;
     });
     await user.click(folder);
-    const gallery = await screen.findByRole('main', { name: 'Generated images' });
-    expect(within(gallery).getByText('2 images')).toBeVisible();
+    const gallery = await screen.findByRole('main', { name: 'Media' });
+    expect(within(gallery).getByText('2 items')).toBeVisible();
     expect(within(gallery).getAllByRole('button')).toHaveLength(2);
     expect(screen.queryByRole('region', { name: 'Chat list' })).toBeNull(); // the gallery replaces the list
   });
@@ -955,22 +955,79 @@ describe('generated images', () => {
     const user = await renderApp();
     await user.click(
       within(screen.getByRole('navigation', { name: 'Main views' })).getByRole('button', {
-        name: /Images/,
+        name: /Media/,
       }),
     );
-    const all = await screen.findByRole('main', { name: 'Generated images' });
-    await within(all).findByText('2 images');
+    const all = await screen.findByRole('main', { name: 'Media' });
+    await within(all).findByText('2 items');
 
     await user.click(screen.getByRole('button', { name: 'ChatGPT Personal' }));
     const empty = await waitFor(() => {
       const f = screen
-        .getAllByRole('button', { name: /^Images0$/ })
+        .getAllByRole('button', { name: /^Media0$/ })
         .find((b) => b.className.includes('tree-item'));
       expect(f).toBeTruthy();
       return f!;
     });
     await user.click(empty);
-    await waitFor(() => expect(screen.getByText(/No generated images found yet/)).toBeVisible());
+    await waitFor(() =>
+      expect(screen.getByText(/No generated pictures or videos found yet/)).toBeVisible(),
+    );
+  });
+
+  it('the media grid shows a video with its still and a play badge, and a filter picks pictures or videos', async () => {
+    const { account } = addImageChat();
+    const now = new Date().toISOString();
+    repo.upsertConversation({
+      accountId: account.id,
+      remoteId: 'clip-chat',
+      remoteTitle: 'Bee clip',
+      createdAt: now,
+      remoteUpdatedAt: now,
+      images: [
+        {
+          ref: 'https://v.example/clip#video',
+          kind: 'generated',
+          poster: 'https://s.example/still#poster',
+        },
+        { ref: 'https://s.example/still#poster', kind: 'generated' },
+      ],
+      messages: [
+        {
+          role: 'assistant',
+          createdAt: now,
+          blocks: [
+            {
+              type: 'video',
+              ref: 'https://v.example/clip#video',
+              poster: 'https://s.example/still#poster',
+            },
+          ],
+        },
+      ],
+    });
+    const user = await renderApp();
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'Main views' })).getByRole('button', {
+        name: /Media/,
+      }),
+    );
+    const gallery = await screen.findByRole('main', { name: 'Media' });
+    await within(gallery).findByText('3 items'); // two pictures and one clip; the still is not a fourth item
+    expect(gallery.querySelectorAll('.thumb-play')).toHaveLength(1);
+
+    const type = within(gallery).getByRole('combobox', { name: 'Filter by type' });
+    await user.selectOptions(type, 'Videos');
+    await within(gallery).findByText('1 item');
+    await user.selectOptions(type, 'Pictures');
+    await within(gallery).findByText('2 items');
+    expect(gallery.querySelectorAll('.thumb-play')).toHaveLength(0);
+
+    await user.selectOptions(type, 'Videos');
+    await within(gallery).findByText('1 item');
+    await user.click(within(gallery).getByRole('button', { name: /Generated video — Bee clip/ }));
+    const big = await screen.findByRole('dialog', { name: 'Generated video' });
+    expect(big.querySelector('video')?.getAttribute('src')).toMatch(/^uac-media:\/\/m\/\d+$/);
   });
 
   it('the gallery can be searched, filtered by project and sorted by date', async () => {
@@ -978,31 +1035,31 @@ describe('generated images', () => {
     const user = await renderApp();
     await user.click(
       within(screen.getByRole('navigation', { name: 'Main views' })).getByRole('button', {
-        name: /Images/,
+        name: /Media/,
       }),
     );
-    const gallery = await screen.findByRole('main', { name: 'Generated images' });
-    await within(gallery).findByText('2 images');
-    await user.type(within(gallery).getByRole('combobox', { name: 'Search images' }), 'zzzz');
-    expect(await within(gallery).findByText(/No images match/)).toBeVisible();
-    await user.clear(within(gallery).getByRole('combobox', { name: 'Search images' }));
+    const gallery = await screen.findByRole('main', { name: 'Media' });
+    await within(gallery).findByText('2 items');
+    await user.type(within(gallery).getByRole('combobox', { name: 'Search media' }), 'zzzz');
+    expect(await within(gallery).findByText(/Nothing matches/)).toBeVisible();
+    await user.clear(within(gallery).getByRole('combobox', { name: 'Search media' }));
     // Completions come in the app's own menu, not the browser's; picking one fills the box.
-    await user.type(within(gallery).getByRole('combobox', { name: 'Search images' }), 'bul');
+    await user.type(within(gallery).getByRole('combobox', { name: 'Search media' }), 'bul');
     const option = await screen.findByRole('option', { name: 'Bull posters' });
     await user.click(option);
-    expect(within(gallery).getByRole('combobox', { name: 'Search images' })).toHaveValue(
+    expect(within(gallery).getByRole('combobox', { name: 'Search media' })).toHaveValue(
       'Bull posters',
     );
     expect(document.querySelector('datalist')).toBeNull();
-    await user.clear(within(gallery).getByRole('combobox', { name: 'Search images' }));
-    await user.type(within(gallery).getByRole('combobox', { name: 'Search images' }), 'bull');
-    await waitFor(() => expect(within(gallery).getByText('2 images')).toBeVisible());
+    await user.clear(within(gallery).getByRole('combobox', { name: 'Search media' }));
+    await user.type(within(gallery).getByRole('combobox', { name: 'Search media' }), 'bull');
+    await waitFor(() => expect(within(gallery).getByText('2 items')).toBeVisible());
     expect(within(gallery).getByRole('combobox', { name: 'Filter by project' })).toBeVisible();
     await user.selectOptions(
       within(gallery).getByRole('combobox', { name: 'Sort by date' }),
       'Oldest first',
     );
-    await waitFor(() => expect(within(gallery).getByText('2 images')).toBeVisible());
+    await waitFor(() => expect(within(gallery).getByText('2 items')).toBeVisible());
   });
 
   it('opening an image from the gallery jumps to its chat', async () => {
@@ -1010,17 +1067,17 @@ describe('generated images', () => {
     const user = await renderApp();
     await user.click(
       within(screen.getByRole('navigation', { name: 'Main views' })).getByRole('button', {
-        name: /Images/,
+        name: /Media/,
       }),
     );
-    const gallery = await screen.findByRole('main', { name: 'Generated images' });
+    const gallery = await screen.findByRole('main', { name: 'Media' });
     await user.click(await within(gallery).findByRole('button', { name: 'a red bull, pixel art' }));
     const box = await screen.findByRole('dialog', { name: 'Image' });
     expect(within(box).getByText(/Bull posters · ChatGPT Acme Store/)).toBeVisible();
     await user.click(within(box).getByRole('button', { name: 'Open chat' }));
     const reader = await screen.findByRole('region', { name: 'Chat reader' });
     expect(await within(reader).findByRole('heading', { name: 'Bull posters' })).toBeVisible();
-    expect(screen.queryByRole('main', { name: 'Generated images' })).toBeNull();
+    expect(screen.queryByRole('main', { name: 'Media' })).toBeNull();
   });
 
   it('the dashboard shows the latest images and links to the gallery', async () => {
@@ -1035,7 +1092,7 @@ describe('generated images', () => {
       await within(dash).findByRole('button', { name: 'a red bull, pixel art' }),
     ).toBeVisible();
     await user.click(within(dash).getByRole('button', { name: 'See all 2' }));
-    expect(await screen.findByRole('main', { name: 'Generated images' })).toBeVisible();
+    expect(await screen.findByRole('main', { name: 'Media' })).toBeVisible();
   });
 });
 
@@ -1277,7 +1334,7 @@ describe('changes on the platform (rename, archive, delete)', { timeout: 30_000 
 });
 
 describe('sidebar tree', () => {
-  it('lists Chats, Projects (with the projects under it), Images and, always last, the Archive; there is no search entry', async () => {
+  it('lists Chats, Projects (with the projects under it), Media and, always last, the Archive; there is no search entry', async () => {
     const user = userEvent.setup();
     await renderApp();
     await user.click(screen.getByRole('button', { name: 'ChatGPT Acme Store' }));
@@ -1291,7 +1348,7 @@ describe('sidebar tree', () => {
     });
     expect(items[0]).toMatch(/^Chats\d+$/);
     expect(items[1]).toMatch(/^Projects\d+$/);
-    expect(items.at(-2)).toMatch(/^Images\d+$/);
+    expect(items.at(-2)).toMatch(/^Media\d+$/);
     expect(items.at(-1)).toMatch(/^Archive\d+$/);
     expect(items.some((x) => /^Inbox/.test(x))).toBe(false);
     const nav = screen.getByRole('navigation', { name: 'Main views' });

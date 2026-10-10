@@ -42,8 +42,8 @@
     "projectsCollapse": "Collapse projects",
     "projectsExpand": "Expand projects",
     "movable": "Drag to reorder, or press Alt+Up / Alt+Down",
-    "images": "Images",
-    "imagesFolder": "Images",
+    "images": "Media",
+    "imagesFolder": "Media",
     "activity": "Activity"
   },
   "list": {
@@ -178,9 +178,9 @@
     "inProjects": "{{count}} chats inside projects",
     "archived": "Archived",
     "archivedSub": "archived chats",
-    "images": "Generated images",
+    "images": "Media",
     "imagesNone": "none found yet",
-    "imagesSome": "shown from ChatGPT",
+    "imagesSome": "shown from the platform",
     "perMonth": "Chats created per month",
     "last6": "last 6 months",
     "perMonthLabel": "Chats created per month: {{values}}",
@@ -189,8 +189,8 @@
     "cleanUntagged": "Chats without a tag",
     "cleanGeneric": "Generic titles to rename",
     "review": "Review in Chats",
-    "imagesTitle": "Generated images",
-    "imagesEmpty": "No generated images found yet. They appear after a sync and are shown from ChatGPT itself.",
+    "imagesTitle": "Generated media",
+    "imagesEmpty": "No generated pictures or videos found yet. They appear after a sync and are shown from the platform itself.",
     "loading": "Loading…",
     "signIn": "Sign in",
     "signInHint": "Open the {{platform}} sign-in window for this profile",
@@ -301,13 +301,15 @@
   "video": {
     "play": "Play video",
     "label": "Generated video",
-    "missing": "The video cannot be shown here. Open the chat on the platform to watch it."
+    "missing": "The video cannot be shown here. Open the chat on the platform to watch it.",
+    "save": "Save video…",
+    "enlarge": "Enlarge"
   },
   "images": {
-    "title": "Generated images",
-    "count_one": "{{count}} image",
-    "count_other": "{{count}} images",
-    "empty": "No generated images found yet. They appear when you sync a ChatGPT profile.",
+    "title": "Media",
+    "count_one": "{{count}} item",
+    "count_other": "{{count}} items",
+    "empty": "No generated pictures or videos found yet. They appear when you sync a profile.",
     "openChat": "Open chat",
     "close": "Close",
     "prev": "Previous image",
@@ -320,14 +322,14 @@
     "seeAll": "See all {{count}}",
     "recent": "Latest",
     "save": "Save image…",
-    "searchLabel": "Search images",
+    "searchLabel": "Search media",
     "searchPlaceholder": "Search by project, chat or prompt…",
     "projectFilter": "Filter by project",
     "allProjects": "All projects",
     "sortLabel": "Sort by date",
     "newest": "Newest first",
     "oldest": "Oldest first",
-    "noMatches": "No images match. Try fewer words or another project."
+    "noMatches": "Nothing matches. Try fewer words, another project or another type."
   },
   "changes": {
     "title": "Changes on {{platform}}",
@@ -390,5 +392,12 @@
     "pointSync": "The first import starts by itself and can take a few minutes. After that, new chats arrive in the background.",
     "pointLocal": "Everything stays on this device. Nothing is sent anywhere except to the platforms you connect.",
     "pointRead": "The app only reads from a platform, unless you turn on changes for a profile."
+  },
+  "media": {
+    "type": "Type",
+    "typeFilter": "Filter by type",
+    "all": "Pictures and videos",
+    "images": "Pictures",
+    "videos": "Videos"
   }
 }

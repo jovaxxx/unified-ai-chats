@@ -60,6 +60,16 @@ describe('a generated video in the reader', () => {
     expect(player?.hasAttribute('controls')).toBe(true);
   });
 
+  it('can be enlarged into the large view, which has its own player at its real size', async () => {
+    show(chat([{ type: 'video', ref: 'v#video', poster: 'p#poster', mediaId: 7, posterId: 8 }]));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Enlarge' }));
+    const big = screen.getByRole('dialog', { name: 'Generated video' });
+    const player = big.querySelector('video');
+    expect(player?.getAttribute('src')).toBe('uac-media://m/7');
+    expect(player?.className).toContain('lightbox-video');
+    expect(screen.getByRole('button', { name: 'Save video…' })).toBeVisible();
+  });
+
   it('says so when there is no file to play, and when the player fails', async () => {
     show(chat([{ type: 'video', ref: 'v#video', mediaId: null }]));
     expect(screen.getByText(/cannot be shown here/)).toBeVisible();

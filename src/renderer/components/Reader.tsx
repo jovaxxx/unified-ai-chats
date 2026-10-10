@@ -37,7 +37,11 @@ export function Reader({
   const [tagDraft, setTagDraft] = useState('');
   const renameRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
-  const [viewing, setViewing] = useState<{ mediaId: number; alt: string | null } | null>(null);
+  const [viewing, setViewing] = useState<{
+    mediaId: number;
+    alt: string | null;
+    kind?: 'image' | 'video';
+  } | null>(null);
   const [copyError, setCopyError] = useState(false);
   // Opening a chat lands on its last message. Images above it can grow after they load, so the view keeps
   // following the end until the reader scrolls by themselves.
@@ -327,7 +331,7 @@ export function Reader({
                 ) : b.type === 'image' ? (
                   <ChatImage key={i} block={b} onOpen={setViewing} />
                 ) : b.type === 'video' ? (
-                  <ChatVideo key={i} block={b} />
+                  <ChatVideo key={i} block={b} onEnlarge={setViewing} />
                 ) : (
                   <pre className="code" key={i}>
                     {b.text}
@@ -351,7 +355,7 @@ export function Reader({
                 ) : b.type === 'image' ? (
                   <ChatImage key={i} block={b} onOpen={setViewing} />
                 ) : b.type === 'video' ? (
-                  <ChatVideo key={i} block={b} />
+                  <ChatVideo key={i} block={b} onEnlarge={setViewing} />
                 ) : (
                   <pre className="code" key={i}>
                     <code>{b.text}</code>
@@ -381,6 +385,7 @@ export function Reader({
       {viewing && (
         <Lightbox
           mediaId={viewing.mediaId}
+          {...(viewing.kind ? { kind: viewing.kind } : {})}
           alt={viewing.alt}
           caption={chat.title}
           onClose={() => setViewing(null)}
@@ -436,7 +441,13 @@ type VideoBlock = Extract<ContentBlock, { type: 'video' }>;
  * A generated video: its still with a play button, and the player once it is clicked. The app fetches the file only
  * then, and keeps it in memory. If it cannot be played, a note says to watch it on the platform.
  */
-function ChatVideo({ block }: { block: VideoBlock }) {
+function ChatVideo({
+  block,
+  onEnlarge,
+}: {
+  block: VideoBlock;
+  onEnlarge: (v: { mediaId: number; alt: string | null; kind: 'video' }) => void;
+}) {
   const { t } = useTranslation();
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -448,33 +459,51 @@ function ChatVideo({ block }: { block: VideoBlock }) {
       </span>
     );
   }
+  const mediaId = block.mediaId;
+  const enlarge = (
+    <button
+      type="button"
+      className="chat-video-enlarge"
+      aria-label={t('video.enlarge')}
+      title={t('video.enlarge')}
+      onClick={() => onEnlarge({ mediaId, alt: null, kind: 'video' })}
+    >
+      <Icon name="expand" size="sm" />
+    </button>
+  );
   if (playing) {
     return (
-      <video
-        className="chat-video"
-        controls
-        autoPlay
-        src={mediaUrl(block.mediaId)}
-        aria-label={t('video.label')}
-        onError={() => setFailed(true)}
-      />
+      <span className="chat-video-wrap">
+        <video
+          className="chat-video"
+          controls
+          autoPlay
+          src={mediaUrl(mediaId)}
+          aria-label={t('video.label')}
+          onError={() => setFailed(true)}
+        />
+        {enlarge}
+      </span>
     );
   }
   return (
-    <button
-      type="button"
-      className="chat-image chat-video-poster"
-      aria-label={t('video.play')}
-      onClick={() => setPlaying(true)}
-    >
-      {block.posterId ? (
-        <StoredImage id={block.posterId} alt="" thumb />
-      ) : (
-        <span className="chat-video-blank" />
-      )}
-      <span className="chat-video-play" aria-hidden="true">
-        <Icon name="play" />
-      </span>
-    </button>
+    <span className="chat-video-wrap">
+      <button
+        type="button"
+        className="chat-image chat-video-poster"
+        aria-label={t('video.play')}
+        onClick={() => setPlaying(true)}
+      >
+        {block.posterId ? (
+          <StoredImage id={block.posterId} alt="" thumb />
+        ) : (
+          <span className="chat-video-blank" />
+        )}
+        <span className="chat-video-play" aria-hidden="true">
+          <Icon name="play" />
+        </span>
+      </button>
+      {enlarge}
+    </span>
   );
 }

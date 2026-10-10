@@ -350,6 +350,8 @@ export function createApi(
     const running = thumbJobs.get(id);
     if (running) return running;
     const job = (async () => {
+      // A video has no small picture of its own: its still has. Never fetch a clip to shrink it.
+      if (repo.mediaSource(id)?.ref.endsWith('#video')) return null;
       const kept = await deps.thumbs?.get(id).catch(() => null);
       if (kept) return { bytes: kept, mime: 'image/jpeg' };
       const full = await fetchImage(id);
@@ -490,8 +492,9 @@ export function createApi(
       if (!deps.saveFile) throw new Error('Saving is not available here.');
       const img = await imageData(mediaId);
       if (!img) throw new Error('This image is not available.');
-      const ext = img.mime === 'image/jpeg' ? 'jpg' : img.mime.replace('image/', '');
-      return deps.saveFile(`image-${mediaId}.${ext}`, img.bytes);
+      const isVideo = img.mime.startsWith('video/');
+      const ext = img.mime === 'image/jpeg' ? 'jpg' : img.mime.replace(/^(image|video)\//, '');
+      return deps.saveFile(`${isVideo ? 'video' : 'image'}-${mediaId}.${ext}`, img.bytes);
     },
     imageSuggest: async (text, scope) => {
       const q = z.string().max(200).parse(text);

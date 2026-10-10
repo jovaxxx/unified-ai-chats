@@ -1650,6 +1650,61 @@ body.is-resizing webview {
   width: 100%;
   height: auto;
 }
+.chat-video-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: min(100%, 560px);
+  margin: 4px 0 12px;
+}
+.chat-video-wrap .chat-video,
+.chat-video-wrap .chat-image {
+  margin: 0;
+}
+.chat-video-enlarge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+.chat-video-enlarge:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.thumb-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  pointer-events: none;
+}
+.thumb-play .icon {
+  fill: currentColor;
+  width: 18px;
+  height: 18px;
+}
+.lightbox-video {
+  display: block;
+  margin: 0 auto;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 150px);
+  background: #000;
+  border-radius: 8px;
+}
 .chat-video-poster {
   position: relative;
   cursor: pointer;

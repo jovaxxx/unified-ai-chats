@@ -382,7 +382,7 @@ describe('generated videos', () => {
     ]);
     expect(chat.images).toEqual(
       expect.arrayContaining([
-        { ref: `${VIDEO}#video`, kind: 'generated' },
+        { ref: `${VIDEO}#video`, kind: 'generated', poster: `${STILL}#poster` },
         { ref: `${STILL}#poster`, kind: 'generated' },
       ]),
     );
@@ -620,7 +620,7 @@ describe('Gemini in the local inbox', () => {
     expect(JSON.stringify(reply.blocks)).not.toContain('image_generation_content');
   });
 
-  it('a generated video is kept out of the picture gallery, and plays from its link after a sync', async () => {
+  it('a generated video is in the media grid with its still, and plays from its link after a sync', async () => {
     const c = setup();
     const accountId = await profile(c);
     const video = 'https://contribution.usercontent.google.com/download?c=TOKEN';
@@ -664,8 +664,17 @@ describe('Gemini in the local inbox', () => {
     expect((await c.api.imageData(block.mediaId!))?.mime).toBe('video/mp4');
     expect((await c.api.imageData(block.posterId!))?.mime).toBe('image/png');
     expect(asked).toEqual([video, still]);
-    // Neither the clip nor its still is a picture of the gallery.
-    expect((await c.api.listImages({ accountId })).total).toBe(0);
+    // The clip is in the media grid with its still (the still is not a second item), and the filter tells them apart.
+    const all = await c.api.listImages({ accountId });
+    expect(all.total).toBe(1);
+    expect(all.items[0]).toMatchObject({
+      kind: 'video',
+      id: block.mediaId,
+      posterId: block.posterId,
+    });
+    expect((await c.api.listImages({ accountId, type: 'video' })).total).toBe(1);
+    expect((await c.api.listImages({ accountId, type: 'image' })).total).toBe(0);
+    expect(await c.api.thumbData(block.mediaId!)).toBeNull(); // never a clip fetched to be shrunk
   });
 
   it("downloads a picture only from Gemini's image host", async () => {

@@ -41,6 +41,8 @@ export function StoredImage({
 
 interface Props {
   mediaId: number;
+  /** A picture (default) or a generated video, shown with its own player at its real size (or as large as fits). */
+  kind?: 'image' | 'video';
   alt: string | null;
   /** Where it came from, e.g. the chat title and profile. */
   caption?: string;
@@ -51,7 +53,16 @@ interface Props {
 }
 
 /** A large view of one image. Esc closes it; the arrow keys move between images when there are several. */
-export function Lightbox({ mediaId, alt, caption, onClose, onPrev, onNext, onOpenChat }: Props) {
+export function Lightbox({
+  mediaId,
+  kind = 'image',
+  alt,
+  caption,
+  onClose,
+  onPrev,
+  onNext,
+  onOpenChat,
+}: Props) {
   const { t } = useTranslation();
   const [saveError, setSaveError] = useState<string | null>(null);
   const save = () => {
@@ -76,8 +87,24 @@ export function Lightbox({ mediaId, alt, caption, onClose, onPrev, onNext, onOpe
       className="overlay overlay--dark"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="lightbox" role="dialog" aria-modal="true" aria-label={t('images.view')}>
-        <StoredImage id={mediaId} alt={alt ?? t('images.altFallback')} lazy={false} />
+      <div
+        className="lightbox"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t(kind === 'video' ? 'video.label' : 'images.view')}
+      >
+        {kind === 'video' ? (
+          <video
+            key={mediaId}
+            className="lightbox-video"
+            controls
+            autoPlay
+            src={mediaUrl(mediaId)}
+            aria-label={t('video.label')}
+          />
+        ) : (
+          <StoredImage id={mediaId} alt={alt ?? t('images.altFallback')} lazy={false} />
+        )}
         <div className="lightbox-bar">
           <div className="lightbox-text">
             {alt && <div className="lightbox-alt">{alt}</div>}
@@ -100,7 +127,7 @@ export function Lightbox({ mediaId, alt, caption, onClose, onPrev, onNext, onOpe
               </button>
             )}
             <button type="button" className="btn" onClick={save}>
-              {t('images.save')}
+              {t(kind === 'video' ? 'video.save' : 'images.save')}
             </button>
             {onOpenChat && (
               <button type="button" className="btn" onClick={onOpenChat}>

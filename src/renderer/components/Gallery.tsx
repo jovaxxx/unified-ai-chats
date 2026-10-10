@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ImageItem, ImageList, Platform } from '../../shared/types';
 import { useNearEnd } from '../useNearEnd';
 import { FilterSelect, SearchField, SortSelect } from './Controls';
+import { Icon } from './Icon';
 import { Lightbox, StoredImage } from './Lightbox';
 import { PlatformLogo } from './PlatformLogo';
 
@@ -17,7 +18,7 @@ interface Props {
   onOpenChat: (conversationId: number) => void;
 }
 
-/** The generated images saved on this Mac, as a grid. Click one to see it large and jump to its chat. */
+/** The generated pictures and videos of the chats, as a grid, with a filter for which. Click one to see it large and jump to its chat. */
 export function Gallery({ scope, version, onOpenChat }: Props) {
   const { t } = useTranslation();
   const [state, setState] = useState<{ key: string; list: ImageList } | null>(null);
@@ -28,10 +29,11 @@ export function Gallery({ scope, version, onOpenChat }: Props) {
   const [search, setSearch] = useState('');
   const [projectId, setProjectId] = useState<number | ''>('');
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
+  const [type, setType] = useState<'all' | 'image' | 'video'>('all');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   // More images load by themselves when the end of the grid comes into view.
   const sentinel = useRef<HTMLDivElement>(null);
-  const key = `${scope.platform ?? ''}:${scope.accountId ?? ''}:${limit}:${version}:${search}:${projectId}:${sort}`;
+  const key = `${scope.platform ?? ''}:${scope.accountId ?? ''}:${limit}:${version}:${search}:${projectId}:${sort}:${type}`;
 
   // What is typed is applied after a short pause, and completions are offered as you type.
   useEffect(() => {
@@ -64,6 +66,7 @@ export function Gallery({ scope, version, onOpenChat }: Props) {
         ...(projectId !== '' ? { projectId } : {}),
         ...(search ? { search } : {}),
         sort,
+        type,
         limit,
       })
       .then((list) => {
@@ -75,7 +78,7 @@ export function Gallery({ scope, version, onOpenChat }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [key, scope.platform, scope.accountId, limit, projectId, search, sort]);
+  }, [key, scope.platform, scope.accountId, limit, projectId, search, sort, type]);
 
   const items: ImageItem[] = state?.list.items ?? [];
   const more = items.length < (state?.list.total ?? 0);
@@ -101,6 +104,20 @@ export function Gallery({ scope, version, onOpenChat }: Props) {
           value={typed}
           onChange={setTyped}
           suggestions={suggestions}
+        />
+        <FilterSelect
+          label={t('media.type')}
+          ariaLabel={t('media.typeFilter')}
+          anyLabel={t('media.all')}
+          value={type === 'all' ? '' : type}
+          options={[
+            { value: 'image', label: t('media.images') },
+            { value: 'video', label: t('media.videos') },
+          ]}
+          onChange={(v) => {
+            setType(v === 'image' || v === 'video' ? v : 'all');
+            setLimit(PAGE);
+          }}
         />
         <FilterSelect
           label={t('list.project')}
@@ -133,7 +150,7 @@ export function Gallery({ scope, version, onOpenChat }: Props) {
       )}
       {state && items.length === 0 ? (
         <p className="empty-note">
-          {search || projectId !== '' ? t('images.noMatches') : t('images.empty')}
+          {search || projectId !== '' || type !== 'all' ? t('images.noMatches') : t('images.empty')}
         </p>
       ) : (
         <ul className="gallery-grid">
@@ -143,10 +160,27 @@ export function Gallery({ scope, version, onOpenChat }: Props) {
                 type="button"
                 className="thumb"
                 onClick={() => setOpen(i)}
-                aria-label={img.alt ?? `${t('images.altFallback')} — ${img.chatTitle}`}
+                aria-label={
+                  img.kind === 'video'
+                    ? `${t('video.label')} — ${img.chatTitle}`
+                    : (img.alt ?? `${t('images.altFallback')} — ${img.chatTitle}`)
+                }
                 title={`${img.chatTitle}${img.projectName ? ` · ${img.projectName}` : ''} · ${new Date(img.date).toLocaleDateString()}`}
               >
-                <StoredImage id={img.id} alt="" thumb />
+                {img.kind === 'video' ? (
+                  <>
+                    {img.posterId ? (
+                      <StoredImage id={img.posterId} alt="" thumb />
+                    ) : (
+                      <span className="chat-video-blank" />
+                    )}
+                    <span className="thumb-play" aria-hidden="true">
+                      <Icon name="play" />
+                    </span>
+                  </>
+                ) : (
+                  <StoredImage id={img.id} alt="" thumb />
+                )}
                 <span className="thumb-badge">
                   <PlatformLogo platform={img.platform} />
                 </span>
@@ -159,6 +193,7 @@ export function Gallery({ scope, version, onOpenChat }: Props) {
       {current && (
         <Lightbox
           mediaId={current.id}
+          kind={current.kind}
           alt={current.alt}
           caption={caption(current)}
           onClose={() => setOpen(null)}

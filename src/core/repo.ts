@@ -35,6 +35,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_TRASH_RETENTION_DAYS = 14;
 /** Bump when an importer learns to keep more of a conversation: older reads are then redone once. */
 /** A chat not updated for this long is only re-read if the platform reports a change. */
+/** What counts as media of an account: a picture, or a video (its still, `#poster`, is not counted). */
+const MEDIA_SHOWN = "(m.ref NOT LIKE '%#%' OR m.ref LIKE '%#video')";
+
 export const STALE_AFTER_MS = 60 * 24 * 3600 * 1000;
 export const PARSE_VERSION = 2;
 
@@ -122,6 +125,7 @@ export interface NewConversation {
     alt?: string;
     width?: number;
     height?: number;
+    poster?: string;
   }[];
 }
 
@@ -430,10 +434,11 @@ export class Repo {
         insertMsg.run(id, m.role, JSON.stringify(m.blocks), m.createdAt);
       }
       const addImage = this.db.prepare(
-        `INSERT INTO media (conversation_id, ref, kind, alt, width, height, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO media (conversation_id, ref, kind, alt, width, height, status, created_at, poster_ref)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (conversation_id, ref) DO UPDATE SET alt = COALESCE(excluded.alt, media.alt),
-           width = COALESCE(excluded.width, media.width), height = COALESCE(excluded.height, media.height)`,
+           width = COALESCE(excluded.width, media.width), height = COALESCE(excluded.height, media.height),
+           poster_ref = COALESCE(excluded.poster_ref, media.poster_ref)`,
       );
       for (const img of c.images ?? []) {
         // Only generated images are downloaded; the ones the user uploaded stay a placeholder.
@@ -446,6 +451,7 @@ export class Repo {
           img.height ?? null,
           img.kind === 'generated' ? 'pending' : 'skipped',
           nowIso,
+          img.poster ?? null,
         );
       }
       for (const tag of c.tags ?? []) this.linkTag(id, tag);
@@ -732,7 +738,7 @@ export class Repo {
                 COUNT(*) AS total,
                 (SELECT COUNT(*) FROM media m JOIN conversations c2 ON c2.id = m.conversation_id
                   WHERE c2.account_id = conversations.account_id AND c2.state IN ('inbox','archived')
-                    AND m.kind = 'generated' AND m.ref NOT LIKE '%#%') AS images
+                    AND m.kind = 'generated' AND ${MEDIA_SHOWN}) AS images
            FROM conversations WHERE state IN ('inbox','archived') GROUP BY account_id`,
       )
       .all() as Row[];
@@ -833,7 +839,7 @@ export class Repo {
       ),
       images: one(
         `SELECT COUNT(*) AS n FROM media m JOIN conversations c ON c.id = m.conversation_id
-          WHERE ${live} AND m.kind = 'generated' AND m.ref NOT LIKE '%#%'`,
+          WHERE ${live} AND m.kind = 'generated' AND ${MEDIA_SHOWN}`,
       ),
     };
 
@@ -912,13 +918,19 @@ export class Repo {
     projectId?: number;
     search?: string;
     sort?: 'newest' | 'oldest';
+    type?: 'all' | 'image' | 'video';
     limit: number;
     offset: number;
   }): ImageList {
-    // References with a `#` are thumbnails of web results, not files of the account: nothing to show.
+    // References with a `#` are thumbnails of web results, not files of the account: nothing to show. A video is
+    // the exception (`#video`); its still (`#poster`) is shown in its place and is not a row of the grid.
     const base = [
       "m.kind = 'generated'",
-      "m.ref NOT LIKE '%#%'",
+      q.type === 'image'
+        ? "m.ref NOT LIKE '%#%'"
+        : q.type === 'video'
+          ? "m.ref LIKE '%#video'"
+          : MEDIA_SHOWN,
       "c.state IN ('inbox','archived')",
     ];
     const params: SQLInputValue[] = [];
@@ -931,7 +943,7 @@ export class Repo {
       params.push(q.platform);
     }
     const join =
-      'FROM media m JOIN conversations c ON c.id = m.conversation_id JOIN accounts a ON a.id = c.account_id LEFT JOIN projects p ON p.id = c.project_id';
+      'FROM media m JOIN conversations c ON c.id = m.conversation_id JOIN accounts a ON a.id = c.account_id LEFT JOIN projects p ON p.id = c.project_id LEFT JOIN media pm ON pm.conversation_id = m.conversation_id AND pm.ref = m.poster_ref';
     const where = [...base];
     const wparams = [...params];
     if (q.projectId !== undefined) {
@@ -950,7 +962,7 @@ export class Repo {
     const rows = this.db
       .prepare(
         `SELECT m.id, m.conversation_id, c.title, a.platform, a.id AS account_id, a.label, m.alt, m.width, m.height,
-                p.name AS project_name, c.remote_updated_at
+                p.name AS project_name, c.remote_updated_at, m.ref, pm.id AS poster_id
            ${join} WHERE ${where.join(' AND ')}
           ORDER BY c.remote_updated_at ${order}, m.id ${order} LIMIT ? OFFSET ?`,
       )
@@ -974,6 +986,8 @@ export class Repo {
       projects,
       items: rows.map((r) => ({
         id: r.id as number,
+        kind: (r.ref as string).endsWith('#video') ? ('video' as const) : ('image' as const),
+        posterId: (r.poster_id as number | null) ?? null,
         conversationId: r.conversation_id as number,
         chatTitle: r.title as string,
         platform: r.platform as Platform,
@@ -998,11 +1012,7 @@ export class Repo {
   ): string[] {
     const needle = text.trim();
     if (!needle) return [];
-    const where = [
-      "m.kind = 'generated'",
-      "m.ref NOT LIKE '%#%'",
-      "c.state IN ('inbox','archived')",
-    ];
+    const where = ["m.kind = 'generated'", MEDIA_SHOWN, "c.state IN ('inbox','archived')"];
     const params: SQLInputValue[] = [];
     if (scope.accountIds) {
       where.push(`a.id IN (${scope.accountIds.map(() => '?').join(',') || 'NULL'})`);
@@ -1038,6 +1048,7 @@ export class Repo {
       ...(q.projectId !== undefined ? { projectId: q.projectId } : {}),
       ...(q.search ? { search: q.search } : {}),
       sort: q.sort,
+      type: q.type,
       limit: q.limit,
       offset: q.offset,
     });

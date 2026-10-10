@@ -402,7 +402,15 @@ export function Dashboard(p: Props) {
                   })
                 }
               >
-                <StoredImage id={img.id} alt="" thumb />
+                {img.kind === 'video' ? (
+                  img.posterId ? (
+                    <StoredImage id={img.posterId} alt="" thumb />
+                  ) : (
+                    <span className="chat-video-blank" />
+                  )
+                ) : (
+                  <StoredImage id={img.id} alt="" thumb />
+                )}
               </button>
             ))}
           </div>

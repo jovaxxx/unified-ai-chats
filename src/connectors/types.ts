@@ -33,6 +33,8 @@ export interface RemoteImage {
   alt?: string;
   width?: number;
   height?: number;
+  /** A video's still: the reference of the picture shown for it. */
+  poster?: string;
 }
 
 export interface DownloadedImage {

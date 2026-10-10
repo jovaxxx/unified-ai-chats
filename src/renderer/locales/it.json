@@ -42,8 +42,8 @@
     "projectsCollapse": "Comprimi i progetti",
     "projectsExpand": "Espandi i progetti",
     "movable": "Trascina per riordinare, oppure premi Alt+Su / Alt+Giù",
-    "images": "Immagini",
-    "imagesFolder": "Immagini",
+    "images": "Media",
+    "imagesFolder": "Media",
     "activity": "Attività"
   },
   "list": {
@@ -178,9 +178,9 @@
     "inProjects": "{{count}} chat dentro i progetti",
     "archived": "Archiviate",
     "archivedSub": "chat archiviate",
-    "images": "Immagini generate",
-    "imagesNone": "nessuna trovata",
-    "imagesSome": "mostrate da ChatGPT",
+    "images": "Media",
+    "imagesNone": "nessuno ancora",
+    "imagesSome": "mostrati dalla piattaforma",
     "perMonth": "Chat create per mese",
     "last6": "ultimi 6 mesi",
     "perMonthLabel": "Chat create per mese: {{values}}",
@@ -189,8 +189,8 @@
     "cleanUntagged": "Chat senza tag",
     "cleanGeneric": "Titoli generici da rinominare",
     "review": "Rivedi nelle Chat",
-    "imagesTitle": "Immagini generate",
-    "imagesEmpty": "Nessuna immagine generata trovata. Compaiono dopo una sincronizzazione e si vedono direttamente da ChatGPT.",
+    "imagesTitle": "Media generati",
+    "imagesEmpty": "Nessuna immagine o video generato trovato. Compaiono dopo una sincronizzazione e si vedono direttamente dalla piattaforma.",
     "loading": "Caricamento…",
     "signIn": "Accedi",
     "signInHint": "Apri la finestra di accesso a {{platform}} per questo profilo",
@@ -301,13 +301,15 @@
   "video": {
     "play": "Riproduci il video",
     "label": "Video generato",
-    "missing": "Il video non si può mostrare qui. Apri la chat sulla piattaforma per guardarlo."
+    "missing": "Il video non si può mostrare qui. Apri la chat sulla piattaforma per guardarlo.",
+    "save": "Salva il video…",
+    "enlarge": "Ingrandisci"
   },
   "images": {
-    "title": "Immagini generate",
-    "count_one": "{{count}} immagine",
-    "count_other": "{{count}} immagini",
-    "empty": "Ancora nessuna immagine generata trovata. Compaiono quando sincronizzi un profilo ChatGPT.",
+    "title": "Media",
+    "count_one": "{{count}} elemento",
+    "count_other": "{{count}} elementi",
+    "empty": "Nessuna immagine o video generato trovato. Compaiono quando sincronizzi un profilo.",
     "openChat": "Apri la chat",
     "close": "Chiudi",
     "prev": "Immagine precedente",
@@ -320,14 +322,14 @@
     "seeAll": "Vedi tutte e {{count}}",
     "recent": "Ultime",
     "save": "Salva immagine…",
-    "searchLabel": "Cerca immagini",
+    "searchLabel": "Cerca nei media",
     "searchPlaceholder": "Cerca per progetto, chat o prompt…",
     "projectFilter": "Filtra per progetto",
     "allProjects": "Tutti i progetti",
     "sortLabel": "Ordina per data",
     "newest": "Più recenti prima",
     "oldest": "Più vecchie prima",
-    "noMatches": "Nessuna immagine trovata. Prova con meno parole o un altro progetto."
+    "noMatches": "Nessun risultato. Prova con meno parole, un altro progetto o un altro tipo."
   },
   "changes": {
     "title": "Modifiche su {{platform}}",
@@ -390,5 +392,12 @@
     "pointSync": "Il primo import parte da solo e può richiedere qualche minuto. Poi le chat nuove arrivano in background.",
     "pointLocal": "Tutto resta su questo dispositivo. Non viene inviato nulla, tranne alle piattaforme che colleghi.",
     "pointRead": "L'app legge soltanto dalle piattaforme, a meno che tu non attivi le modifiche per un profilo."
+  },
+  "media": {
+    "type": "Tipo",
+    "typeFilter": "Filtra per tipo",
+    "all": "Immagini e video",
+    "images": "Immagini",
+    "videos": "Video"
   }
 }

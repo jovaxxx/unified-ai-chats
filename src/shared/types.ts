@@ -310,6 +310,9 @@ export interface PurgeResult {
 /** An image saved on this Mac, with where it came from. */
 export interface ImageItem {
   id: number;
+  /** A picture, or a generated video (then `posterId` is its still, for the grid). */
+  kind: 'image' | 'video';
+  posterId: number | null;
   conversationId: number;
   chatTitle: string;
   platform: Platform;
@@ -335,6 +338,8 @@ export const imageQuerySchema = z.object({
   /** Words that must appear in the chat title, the project name or what the image was made from. */
   search: z.string().max(200).optional(),
   sort: z.enum(['newest', 'oldest']).default('newest'),
+  /** Pictures, videos, or both. */
+  type: z.enum(['all', 'image', 'video']).default('all'),
 });
 export type ImageQuery = z.input<typeof imageQuerySchema>;
 

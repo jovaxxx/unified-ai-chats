@@ -291,7 +291,7 @@ export function parseConversation(
       const ref = `${v.video}${VIDEO_MARK}`;
       const poster = v.poster ? `${v.poster}${POSTER_MARK}` : undefined;
       blocks.push({ type: 'video', ref, ...(poster ? { poster } : {}) });
-      images.set(ref, { ref, kind: 'generated' });
+      images.set(ref, { ref, kind: 'generated', ...(poster ? { poster } : {}) });
       if (poster) images.set(poster, { ref: poster, kind: 'generated' });
     }
     // Pictures the text pointed at but whose links were not found: counted, never hidden.

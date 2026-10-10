@@ -823,7 +823,11 @@ describe('backup before a migration', () => {
       expect(readdirNames(d).some((n) => n.includes('backup'))).toBe(false);
 
       // An older database (as if written by the previous version of the app), holding some data.
+      rmSync(file, { force: true });
+      rmSync(`${file}-wal`, { force: true });
+      rmSync(`${file}-shm`, { force: true });
       const old = new DatabaseSync(file);
+      for (let i = 0; i < 8; i++) old.exec(migrations[i] as string); // really the schema of version 8
       old.exec("INSERT INTO accounts (platform, label, partition) VALUES ('chatgpt', 'Acme', 'p')");
       old.exec('PRAGMA user_version = 8');
       old.close();
@@ -915,5 +919,36 @@ describe('migration 12', () => {
       { id: 1, last_sync_at: null },
       { id: 2, last_sync_at: '2026-10-10T10:00:00.000Z' },
     ]);
+  });
+});
+
+describe('migration 13', () => {
+  it('tells each video which still is its own, from the blocks of its chat', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    for (let i = 0; i < 12; i++) db.exec(migrations[i] as string);
+    db.exec('PRAGMA user_version = 12');
+    db.exec(`
+      INSERT INTO accounts (id, platform, label, partition) VALUES (1, 'gemini', 'G', 'persist:gemini-a');
+      INSERT INTO conversations (id, account_id, remote_id, remote_title, title, created_at, updated_at, remote_updated_at)
+        VALUES (1, 1, 'a', 't', 't', 'x', 'x', 'x');
+      INSERT INTO media (conversation_id, ref, kind, status, created_at) VALUES
+        (1, 'https://v.example/one#video', 'generated', 'pending', 'x'),
+        (1, 'https://v.example/two#video', 'generated', 'pending', 'x'),
+        (1, 'https://s.example/one#poster', 'generated', 'pending', 'x'),
+        (1, 'https://p.example/pic', 'generated', 'pending', 'x');
+      INSERT INTO messages (conversation_id, role, content_json, created_at) VALUES
+        (1, 'assistant', '[{"type":"text","text":"hi"},{"type":"video","ref":"https://v.example/one#video","poster":"https://s.example/one#poster"},{"type":"video","ref":"https://v.example/two#video"}]', 'x');
+    `);
+    migrate(db);
+    expect(
+      db.prepare("SELECT ref, poster_ref FROM media WHERE ref LIKE '%#video' ORDER BY ref").all(),
+    ).toEqual([
+      { ref: 'https://v.example/one#video', poster_ref: 'https://s.example/one#poster' },
+      { ref: 'https://v.example/two#video', poster_ref: null },
+    ]);
+    expect(
+      db.prepare("SELECT poster_ref FROM media WHERE ref = 'https://p.example/pic'").get(),
+    ).toEqual({ poster_ref: null });
   });
 });

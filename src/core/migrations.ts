@@ -215,4 +215,17 @@ export const migrations: string[] = [
    WHERE platform = 'gemini'
      AND id IN (SELECT account_id FROM conversations WHERE remote_updated_at = '1970-01-01T00:00:00.000Z');
   `,
+  /* 13: a video's still is its own row of `media`; the video row now says which one (`poster_ref`), so a grid of media
+         can show the still for the video. Videos kept before this get theirs from the chat's own blocks. */
+  `
+  ALTER TABLE media ADD COLUMN poster_ref TEXT;
+  UPDATE media SET poster_ref = (
+    SELECT json_extract(b.value, '$.poster')
+      FROM messages ms, json_each(ms.content_json) b
+     WHERE ms.conversation_id = media.conversation_id
+       AND json_extract(b.value, '$.type') = 'video'
+       AND json_extract(b.value, '$.ref') = media.ref
+     LIMIT 1)
+   WHERE ref LIKE '%#video';
+  `,
 ];
