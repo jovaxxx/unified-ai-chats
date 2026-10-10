@@ -152,3 +152,47 @@ describe('ChatGPT directive markers', () => {
     expect(stripMarkdown(draft)).not.toMatch(/:::|writing/);
   });
 });
+
+describe('the settings line of a directive', () => {
+  it('is taken out with the directive, and what the answer says stays', () => {
+    const text = [
+      'Here is the context:',
+      '',
+      ':::contextList',
+      '【{"image_fetch": "a red bull, pixel art"}】',
+      '**Bull posters**  ',
+      'Three of them.',
+      ':::',
+      '',
+      'Done.',
+    ].join('\n');
+    const clean = cleanDirectives(text);
+    expect(clean).not.toContain('【');
+    expect(clean).not.toContain('image_fetch');
+    expect(clean).not.toContain(':::');
+    expect(clean).toContain('**Bull posters**');
+    expect(clean).toContain('Three of them.');
+    expect(clean).toContain('Done.');
+  });
+
+  it('is also taken out when it stands alone, but never inside a code block', () => {
+    expect(cleanDirectives('Before.\n【{"image_fetch": "x"}】\nAfter.')).toBe('Before.\nAfter.');
+    const code = '```\n【{"image_fetch": "x"}】\n```';
+    expect(cleanDirectives(`:::contextList\n${code}\n:::`)).toBe(code);
+    expect(stripMarkdown(':::contextList\n【{"image_fetch": "x"}】\nSome text\n:::')).toBe(
+      'Some text',
+    );
+  });
+});
+
+describe('old-style citation markers', () => {
+  it('are taken out of the text and of the previews, except inside code', () => {
+    expect(cleanDirectives('A claim【12†source】 and another【3:0†news】.')).toBe(
+      'A claim and another.',
+    );
+    expect(stripMarkdown('A claim【12†source】 here.')).toBe('A claim here.');
+    const code = '```\nx【12†source】\n```';
+    expect(cleanDirectives(code)).toBe(code);
+    expect(cleanDirectives('Brackets 【like this】 stay.')).toBe('Brackets 【like this】 stay.');
+  });
+});

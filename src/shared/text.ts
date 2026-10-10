@@ -23,15 +23,25 @@ export function stripMarkdown(input: string): string {
 
 const DIRECTIVE_OPEN = /^\s{0,3}:{3,}\s*([A-Za-z][\w-]*)(?:\{(.*)\})?\s*$/;
 const DIRECTIVE_CLOSE = /^\s{0,3}:{3,}\s*$/;
+/** A line that only holds a directive's settings, as JSON between corner brackets: `【{"image_fetch": "…"}】`. */
+/** An old-style citation marker: `【12†source】`. */
+const CITATION = /[ \t]?【[^】\n]*†[^】\n]*】/g;
+const DIRECTIVE_SETTINGS = /^\s*【\{.*\}】\s*$/;
 
 /**
  * ChatGPT marks some of its answers with container directives, for example
- * `:::writing{variant="chat_message" id="…"}` … `:::` around a drafted message or email, or `:::contextList`.
+ * `:::writing{variant="chat_message" id="…"}` … `:::` around a drafted message or email, or `:::contextList`
+ * followed by a line of settings (`【{"image_fetch": "…"}】`), and old-style citation markers (`【12†source】`).
  * Shown as plain text they are just noise. This removes the opening and closing marker lines and keeps what is
  * inside; an email's subject, when the marker carries one, becomes a bold first line. Code blocks are left alone.
  */
 export function cleanDirectives(text: string): string {
-  if (!/^\s{0,3}:{3,}\s*[A-Za-z]/m.test(text)) return text;
+  if (
+    !/^\s{0,3}:{3,}\s*[A-Za-z]/m.test(text) &&
+    !/^\s*【\{.*\}】\s*$/m.test(text) &&
+    !/【[^】\n]*†[^】\n]*】/.test(text)
+  )
+    return text;
   const out: string[] = [];
   let fenced = false;
   let depth = 0;
@@ -53,8 +63,10 @@ export function cleanDirectives(text: string): string {
         depth--;
         continue;
       }
+      // The settings of a directive sit on a line of their own (outside any code block): plumbing, never shown.
+      if (DIRECTIVE_SETTINGS.test(line)) continue;
     }
-    out.push(line);
+    out.push(fenced ? line : line.replace(CITATION, ''));
   }
   return out.join('\n');
 }
