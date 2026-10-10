@@ -643,10 +643,24 @@ describe('ChatGPT connector', () => {
 
       const chat = await c.getConversation(x, uuid(90));
       expect(chat.remoteTitle).toBe('Work one');
+      expect(chat).toMatchObject({ projectRemoteId: 'work', projectName: 'WORK' }); // its own folder
       expect(chat.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
       expect(s.flatCalls).toHaveLength(1);
       expect(s.flatCalls[0]).toContain('num_turns=100');
       expect(chat.skipped).toBeUndefined();
+    });
+
+    it('are found even when they are older than the last sync, because the work list is never cut short', async () => {
+      const s = server({
+        chats: chats(2),
+        work: [{ ...work(90, 'Old work chat'), update: '2026-01-01T00:00:00Z' }],
+      });
+      const c = createChatGptConnector({ sleep: noSleep });
+      const x = ctx(s.http);
+      const since = new Date('2026-09-20T00:00:00Z'); // long after that chat was last changed
+      const ids = await list(c, x, since);
+      expect(ids).toContain(uuid(90));
+      expect(c.notes!(x)).toMatchObject({ work: 1, workListed: 1 });
     });
 
     it('say so when the site did not return the earlier turns', async () => {

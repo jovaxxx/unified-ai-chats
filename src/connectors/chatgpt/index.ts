@@ -8,6 +8,10 @@ import type {
 import { ChatGptClient, type ClientOptions } from './client';
 import { parseConversation } from './parse';
 
+/** The folder the work chats are filed in (a project of its own that the platform does not have). */
+const WORK_FOLDER_ID = 'work';
+const WORK_FOLDER_NAME = 'WORK';
+
 /** Project names found at the start of a sync, used when each conversation is read. */
 const projectNames = new WeakMap<AccountContext, Map<string, string>>();
 /** Counts about the last listing (numbers only), so a gap between what ChatGPT says and what was read shows. */
@@ -126,18 +130,17 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
           yield summary(item.id, item.update_time);
         }
       }
-      // The list the site keeps apart for "work" chats; the ordinary list leaves them out. A failure here never stops
-      // the rest of the sync.
+      // The list the site keeps apart for "work" chats; the ordinary list leaves them out. It is short, so it is read
+      // whole every time (never cut at "since"): a work chat that existed before this was built must still be found, and
+      // the sync skips the ones it already has. A failure here never stops the rest of the sync.
       const work = new Set<string>();
       workChats.set(ctx, work);
+      notes.workListed = 0;
       try {
         for (const archived of [false, true]) {
-          for await (const item of client.conversations(
-            archived,
-            (i) => !fresh(i.update_time),
-            'tpp',
-          )) {
+          for await (const item of client.conversations(archived, undefined, 'tpp')) {
             work.add(item.id);
+            notes.workListed = (notes.workListed ?? 0) + 1;
             if (seen.has(item.id)) continue;
             seen.add(item.id);
             notes.work = (notes.work ?? 0) + 1;
@@ -232,17 +235,22 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
           ? { ...parsed, skipped: { ...parsed.skipped, 'turns:maybe-more': 1 } }
           : parsed;
       };
+      /** Work chats sit in a folder of their own, WORK, unless they already belong to a project. */
+      const inWorkFolder = (c: RemoteConversation): RemoteConversation =>
+        workChats.get(ctx)?.has(remoteId) && !c.projectRemoteId
+          ? { ...c, projectRemoteId: WORK_FOLDER_ID, projectName: WORK_FOLDER_NAME }
+          : c;
       const asOrdinary = async () =>
         parseConversation(await client.conversation(remoteId), remoteId, (id) => names?.get(id));
       // A work chat is read the way the site reads it; the old way is the fallback, and the other way round.
       const first = workChats.get(ctx)?.has(remoteId) ? asWork : asOrdinary;
       const second = first === asWork ? asOrdinary : asWork;
       try {
-        return await first();
+        return inWorkFolder(await first());
       } catch (err) {
         if (!(err instanceof NotFound) && !(err instanceof EndpointChanged)) throw err;
         try {
-          return await second();
+          return inWorkFolder(await second());
         } catch (again) {
           // The way that was tried first is the one worth reporting when neither works.
           if (again instanceof NotFound || again instanceof EndpointChanged) throw err;
