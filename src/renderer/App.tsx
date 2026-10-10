@@ -181,10 +181,11 @@ export function App() {
       try {
         const s = await api.syncRecent();
         last = Date.now();
-        if (s.imported > 0) {
+        // Chats filed into a folder or moved to the Trash change the sidebar even when nothing new was imported.
+        if (s.imported > 0 || (s.removed ?? 0) > 0 || (s.listing?.filedInFolder ?? 0) > 0) {
           setVersion((v) => v + 1);
-          setToast({ message: t('toast.refreshed', { count: s.imported }) });
         }
+        if (s.imported > 0) setToast({ message: t('toast.refreshed', { count: s.imported }) });
       } catch {
         /* quiet: the next refresh tries again, and Sync now shows real errors */
       } finally {

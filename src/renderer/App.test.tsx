@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApi } from '../core/api';
 import { openDatabase } from '../core/db';
 import { ensureDemoData, seedFixtures } from '../core/fixtures';
@@ -1342,6 +1342,32 @@ describe('changes on the platform (rename, archive, delete)', { timeout: 30_000 
 });
 
 describe('sidebar tree', () => {
+  it('shows a folder that the background refresh filled, even when it imported nothing new', async () => {
+    repo.setSetting('demo_data', '0'); // the background refresh only runs on real data
+    const account = repo.filterOptions().accounts.find((a) => a.platform === 'chatgpt')!;
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const real = window.api;
+      window.api = {
+        ...real,
+        syncRecent: async () => {
+          // Like a sync that only files chats it already had into WORK: nothing imported.
+          repo.upsertProject(account.id, 'work', 'WORK');
+          return { seen: 4, imported: 0, failed: 0, errors: [], listing: { filedInFolder: 4 } };
+        },
+      };
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<App />);
+      await screen.findByText('Shopify theme structure: sections and metafields');
+      await user.click(screen.getByRole('button', { name: `ChatGPT ${account.label}` }));
+      expect(screen.queryByRole('button', { name: /^WORK\d+$/ })).toBeNull();
+      await vi.advanceTimersByTimeAsync(3 * 60_000 + 1000);
+      expect(await screen.findByRole('button', { name: /^WORK\d+$/ })).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows WORK on the main level of the tree, beside Chats and Projects and not among the projects', async () => {
     const account = repo.filterOptions().accounts.find((a) => a.platform === 'chatgpt')!;
     const now = new Date().toISOString();
