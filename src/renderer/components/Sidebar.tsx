@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Platform, SidebarData } from '../../shared/types';
+import { MAX_PROFILES_PER_PLATFORM } from '../../shared/limits';
 import { LANGUAGES, setLanguage, type Language } from '../i18n';
 import { ALL_CHATS, isAllChats, type Filters } from '../filters';
 import { readJson, writeJson } from '../storage';
@@ -71,6 +72,12 @@ export function Sidebar({
       return next;
     });
   const hasLocal = data?.platforms.some((p) => p.platform === 'claude-code') ?? false;
+  // Whether a platform already has all the accounts this version connects (the demo data does not count).
+  const isFull = (platform: Platform) =>
+    !!data &&
+    !data.demo &&
+    (data.platforms.find((p) => p.platform === platform)?.accounts.length ?? 0) >=
+      MAX_PROFILES_PER_PLATFORM;
   // A source the app can import from (local sessions or a connected ChatGPT profile).
   const hasSyncable =
     data?.platforms.some(
@@ -496,6 +503,8 @@ export function Sidebar({
                 type="button"
                 role="menuitem"
                 className="menu-item"
+                disabled={isFull('chatgpt')}
+                title={isFull('chatgpt') ? t('nav.onePerPlatform') : undefined}
                 onClick={() => {
                   setAddOpen(false);
                   onAddProfile('chatgpt');
@@ -503,11 +512,14 @@ export function Sidebar({
               >
                 <PlatformLogo platform="chatgpt" />
                 {t('platforms.chatgpt')}
+                {isFull('chatgpt') && <span className="count">{t('nav.connected')}</span>}
               </button>
               <button
                 type="button"
                 role="menuitem"
                 className="menu-item"
+                disabled={isFull('claude')}
+                title={isFull('claude') ? t('nav.onePerPlatform') : undefined}
                 onClick={() => {
                   setAddOpen(false);
                   onAddProfile('claude');
@@ -515,6 +527,7 @@ export function Sidebar({
               >
                 <PlatformLogo platform="claude" />
                 {t('platforms.claude')}
+                {isFull('claude') && <span className="count">{t('nav.connected')}</span>}
               </button>
               {SOON.map((p) => (
                 <button

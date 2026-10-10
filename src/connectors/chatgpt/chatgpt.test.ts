@@ -825,7 +825,13 @@ describe('importing ChatGPT into the local inbox', () => {
   it('one profile failing does not stop the others', async () => {
     const c = setup();
     await signedInProfile(c, 'Acme Store', 'user-AAA');
-    await signedInProfile(c, 'Bluewave Studio', 'user-BBB');
+    // A second profile of the same platform, made straight in the database: signing in connects only one.
+    c.repo.addAccount({
+      platform: 'chatgpt',
+      label: 'Bluewave Studio',
+      partition: 'persist:chatgpt-extra',
+      identityHint: 'user-BBB',
+    });
     const s = server({ userId: 'user-BBB', chats: chats(2) }); // both profiles use this session: only BBB matches
     c.web.setHttp(s.http);
     const stats = await c.api.syncAll();

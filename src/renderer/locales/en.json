@@ -19,6 +19,8 @@
     "inbox": "Chats",
     "projects": "Projects",
     "archive": "Archive",
+    "connected": "Connected",
+    "onePerPlatform": "This version connects one account per platform.",
     "addAccount": "Add account",
     "addAccountSoon": "Adding accounts arrives with the first platform connector",
     "localNote": "Data stays on this device.",

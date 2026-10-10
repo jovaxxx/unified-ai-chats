@@ -40,6 +40,16 @@ async function profile(c: Ctx, label: string, identity: string): Promise<number>
   return (await c.api.signInFinish(attemptId, { type: 'new', label })).accountId;
 }
 
+/** A second profile of the same platform, made straight in the database: signing in connects only one per platform. */
+function extraProfile(c: Ctx, label: string, identity: string): number {
+  return c.repo.addAccount({
+    platform: 'chatgpt',
+    label,
+    partition: `persist:chatgpt-extra-${label}`,
+    identityHint: identity,
+  });
+}
+
 function addChats(repo: Repo, accountId: number, n: number, prefix = 'Chat'): number[] {
   return Array.from({ length: n }, (_, i) =>
     repo.upsertConversation({
@@ -273,7 +283,7 @@ describe('deleting on the platform (the function that matters)', () => {
   it('profiles that do not allow changes are only offered a removal from this app', async () => {
     const c = setup();
     const on = await profile(c, 'Acme Store', 'user-A');
-    const off = await profile(c, 'Bluewave Studio', 'user-B');
+    const off = extraProfile(c, 'Bluewave Studio', 'user-B');
     await c.api.allowChanges(on, true);
     const ids = [...addChats(c.repo, on, 2, 'On'), ...addChats(c.repo, off, 3, 'Off')];
     await trash(c, ids);

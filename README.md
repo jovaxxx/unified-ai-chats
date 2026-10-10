@@ -2,7 +2,7 @@
 
 An open-source desktop app that works like an email client for your AI chats.
 
-Connect your ChatGPT and Claude accounts (several per platform, e.g. Personal and Work) and the Claude Code sessions on your Mac, and get one local inbox with everything organized the way it is on each platform: chats, projects, archive, generated images. Search, tag, archive and sort everything in one place.
+Connect your ChatGPT and Claude accounts and the Claude Code sessions on your Mac, and get one local inbox with everything organized the way it is on each platform: chats, projects, archive, generated images. Search, tag, archive and sort everything in one place.
 
 ![Screenshot of the inbox (synthetic data, taken from an early version)](docs/screenshot.png)
 

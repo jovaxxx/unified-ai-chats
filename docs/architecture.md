@@ -43,7 +43,7 @@ Every bulk action returns the ids it actually changed, so **Undo** only reverts 
 
 ## Profiles and the dashboard
 
-- A **profile** is an account with a free-text name chosen by the user (a client, a project, "Personal"). There can be any number per platform; names are unique per platform ignoring case and can be renamed.
+- A **profile** is an account with a free-text name chosen by the user (a client, a project, "Personal"). There is one profile per platform; its name can be changed.
 - Adding an account is **sign in first, then decide**: the app recognises an account that is already a profile (no duplicate) and only asks for a name when the account is new.
 - Clicking a **platform** opens its dashboard (sync status, chats / projects / archived / images, chats per month, "to clean" suggestions); clicking a **profile** opens the list and reader for that profile. Each "to clean" row opens the list with the same filter, so the number on the dashboard equals what the list shows.
 
@@ -82,7 +82,7 @@ Built from a structure report recorded on a real account.
 
 ## Sign-in windows and the structure recorder
 
-Each profile has its own persistent partition (`persist:<platform>-<id>`), so several accounts of one platform stay signed in at once. The account id is read from the platform's own page from inside its window; only the id and a display name leave the page, never the token.
+Each profile has its own persistent partition (`persist:<platform>-<id>`), so its sign-in stays separate from everything else. The account id is read from the platform's own page from inside its window; only the id and a display name leave the page, never the token.
 
 The **structure recorder** (opt-in, per profile, only while "Start recording" is on; `src/tools/recorder.ts`) attaches the Chrome DevTools debugger to that window and reduces every JSON response to its **shape**: field names and types, never values. Ids, locale and hex are masked; analytics and bot-check calls are skipped; only the platform's own hosts are considered. The report is saved to `<userData>/captures/` and is only sent anywhere if the user sends it.
 

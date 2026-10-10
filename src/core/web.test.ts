@@ -124,19 +124,18 @@ describe('adding a web account: sign in first, then decide', () => {
     expect(c.repo.sidebar().demo).toBe(true); // nothing was touched
   });
 
-  it('a different account gets its own profile and its own session', async () => {
+  it('connects one account per platform: a second, different account is refused and nothing is created', async () => {
     const c = setup();
-    const a = await addProfile(c, 'Acme Store', 'user-AAA');
-    const b = await addProfile(c, 'Bluewave Studio', 'user-BBB');
-    expect(c.repo.getAccount(a.accountId)!.partition).not.toBe(
-      c.repo.getAccount(b.accountId)!.partition,
-    );
+    await addProfile(c, 'Acme Store', 'user-AAA');
     c.signedInAs('user-BBB');
     const { attemptId } = await c.api.signInStart('chatgpt');
-    expect(await c.api.signInStatus(attemptId)).toMatchObject({
-      match: { label: 'Bluewave Studio' },
-      candidates: [],
-    });
+    await c.api.signInStatus(attemptId);
+    await expect(
+      c.api.signInFinish(attemptId, { type: 'new', label: 'Bluewave Studio' }),
+    ).rejects.toThrow(/one account per platform/);
+    expect(c.repo.profilesOf('chatgpt').map((p) => p.label)).toEqual(['Acme Store']);
+    await c.api.signInCancel(attemptId);
+    expect(c.wiped).toContain(c.partitionOf(attemptId)); // the session of the refused sign-in is wiped
   });
 
   it('a profile made before identities were recorded is offered, and gets its identity', async () => {
@@ -195,17 +194,13 @@ describe('adding a web account: sign in first, then decide', () => {
     ).rejects.toThrow(/does not exist/);
   });
 
-  it('a name clash keeps the attempt alive so the user can pick another name', async () => {
+  it('a blank name keeps the attempt alive so the user can fix it', async () => {
     const c = setup();
-    await addProfile(c, 'Acme Store', 'user-AAA');
     c.signedInAs('user-CCC');
     const { attemptId } = await c.api.signInStart('chatgpt');
     await c.api.signInStatus(attemptId);
-    await expect(
-      c.api.signInFinish(attemptId, { type: 'new', label: 'acme store' }),
-    ).rejects.toThrow(/already have a profile/);
     await expect(c.api.signInFinish(attemptId, { type: 'new', label: '   ' })).rejects.toThrow();
-    const ok = await c.api.signInFinish(attemptId, { type: 'new', label: 'Third client' });
+    const ok = await c.api.signInFinish(attemptId, { type: 'new', label: 'First client' });
     expect(ok.created).toBe(true);
   });
 

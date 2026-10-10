@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createChatGptConnector } from '../connectors/chatgpt';
 import { createClaudeConnector } from '../connectors/claude';
+import { MAX_PROFILES_PER_PLATFORM, ONE_PER_PLATFORM_MESSAGE } from '../shared/limits';
 import type { ClientOptions } from '../connectors/chatgpt/client';
 import { claudeCodeConnector } from '../connectors/claude-code';
 import type { AccountContext, Connector, DownloadUrl, HttpJson } from '../connectors/types';
@@ -617,6 +618,7 @@ export function createApi(
       if (choice.type === 'new') {
         const twin = a.identity ? profiles.find((x) => x.identity === a.identity) : undefined;
         if (twin) throw new Error(`This account is already connected as “${twin.label}”.`);
+        if (profiles.length >= MAX_PROFILES_PER_PLATFORM) throw new Error(ONE_PER_PLATFORM_MESSAGE);
         // First real source: the demo data goes. A name clash is impossible while only demo data
         // exists, and real data is never deleted.
         repo.removeDemoData();

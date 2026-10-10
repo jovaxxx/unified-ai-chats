@@ -441,7 +441,7 @@ describe('adding a ChatGPT account (sign in first)', { timeout: 20_000 }, () => 
     ]);
   });
 
-  it('recognises an account that is already a profile: no name, no duplicate', async () => {
+  it('connects one account per platform: once ChatGPT has a profile its menu entry is off, with the reason', async () => {
     const web = fakeWeb();
     web.setHttp(emptyChatGpt());
     window.api = createApi(repo, { openExternal: async () => {}, web: web.host });
@@ -453,39 +453,12 @@ describe('adding a ChatGPT account (sign in first)', { timeout: 20_000 }, () => 
 
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('button', { name: 'Add account' });
-    const dialog = await openSignIn(user);
-
-    // Signs in as the same account: the dialog closes by itself and says nothing needs to be created.
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), SLOW);
-    const dash = await screen.findByRole('main', { name: 'ChatGPT' });
-    await within(dash).findByText(/profile Acme Store/);
-    expect(repo.profilesOf('chatgpt')).toHaveLength(1);
-    void dialog;
-  });
-
-  it('asks which profile it is when the platform does not say who signed in', async () => {
-    const web = fakeWeb();
-    window.api = createApi(repo, { openExternal: async () => {}, web: web.host });
-    web.signedInAs('user-AAA');
-    const first = await window.api.signInStart('chatgpt');
-    await window.api.signInStatus(first.attemptId);
-    await window.api.signInFinish(first.attemptId, { type: 'new', label: 'Acme Store' });
-
-    web.signedInAs(null);
-    web.onlyAfterUserSaysSo();
-    const user = userEvent.setup();
-    render(<App />);
-    await screen.findByRole('button', { name: 'Add account' });
-    const dialog = await openSignIn(user);
-
-    await user.click(within(dialog).getByRole('button', { name: 'I’ve signed in' }));
-    await within(dialog).findByText(/did not say which account this is/);
-    const cont = within(dialog).getByRole('button', { name: 'Continue' });
-    expect(cont).toBeDisabled(); // never guesses: the user has to choose
-    await user.click(within(dialog).getByRole('radio', { name: /my profile “Acme Store”/ }));
-    await user.click(cont);
-    await screen.findByRole('main', { name: 'ChatGPT' });
+    await user.click(await screen.findByRole('button', { name: 'Add account' }));
+    const chatgpt = screen.getByRole('menuitem', { name: /ChatGPT/ });
+    expect(chatgpt).toBeDisabled();
+    expect(chatgpt).toHaveTextContent('Connected');
+    expect(chatgpt).toHaveAttribute('title', 'This version connects one account per platform.');
+    expect(screen.getByRole('menuitem', { name: /Claude$/ })).toBeEnabled(); // another platform is still open
     expect(repo.profilesOf('chatgpt')).toHaveLength(1);
   });
 

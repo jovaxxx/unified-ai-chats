@@ -19,6 +19,8 @@
     "inbox": "Chat",
     "projects": "Progetti",
     "archive": "Archivio",
+    "connected": "Collegato",
+    "onePerPlatform": "Questa versione collega un account per piattaforma.",
     "addAccount": "Aggiungi account",
     "addAccountSoon": "L'aggiunta di account arriva con il primo connettore di piattaforma",
     "localNote": "Dati salvati solo su questo dispositivo.",
