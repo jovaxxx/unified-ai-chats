@@ -126,6 +126,12 @@ export function createChatGptConnector(opts?: ClientOptions): Connector {
       }
       notes.found = seen.size;
       notes.listTotal = client.listTotal ?? 0;
+      // Numbers only: how many chats each first page held, when the newest changed, and what a run counts as new.
+      const sec = (ms: number | null | undefined) => (ms ? Math.floor(ms / 1000) : 0);
+      notes.firstPageItems = client.firstPages.active?.items ?? 0;
+      notes.firstPageNewest = sec(client.firstPages.active?.newest);
+      notes.archivedFirstPageItems = client.firstPages.archived?.items ?? 0;
+      notes.newerThan = sec(since?.getTime());
       for (const pin of pinnedChats) {
         if (seen.has(pin.id)) continue;
         seen.add(pin.id);

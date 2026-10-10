@@ -578,6 +578,22 @@ describe('ChatGPT connector', () => {
     ).toHaveLength(0); // did not page further
   });
 
+  it('notes what the first page of the list held, even when an incremental run cuts the list short', async () => {
+    const s = server({ chats: chats(70) });
+    const c = createChatGptConnector({ sleep: noSleep });
+    const x = ctx(s.http);
+    const since = new Date(Date.UTC(2026, 8, 20, 12, 0) - 4.5 * 3_600_000);
+    await list(c, x, since);
+    const notes = c.notes!(x);
+    expect(notes).toMatchObject({
+      firstPageItems: 28,
+      listTotal: 70, // known although the run stopped on the first page
+      newerThan: Math.floor(since.getTime() / 1000),
+    });
+    expect(notes.firstPageNewest).toBeGreaterThan(0);
+    expect(notes.firstPageNewest).toBeGreaterThan(notes.newerThan!); // something newer than the cut-off exists
+  });
+
   it('refuses to import when the profile is signed in as a different account', async () => {
     const s = server({ userId: 'user-BBB', chats: chats(2) });
     const c = createChatGptConnector({ sleep: noSleep });
