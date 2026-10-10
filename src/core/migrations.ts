@@ -197,4 +197,12 @@ export const migrations: string[] = [
   UPDATE conversations SET parse_version = 0
    WHERE account_id IN (SELECT id FROM accounts WHERE platform = 'gemini');
   `,
+  /* 11: migration 10 only reached Gemini chats changed in the last 60 days: an older chat is never read again, by
+         design. Gemini has few chats, so they are all read once more: their "changed at" goes back to the start and
+         the profile's last sync is forgotten, so the next run lists everything and reads every chat. */
+  `
+  UPDATE conversations SET parse_version = 0, remote_updated_at = '1970-01-01T00:00:00.000Z'
+   WHERE account_id IN (SELECT id FROM accounts WHERE platform = 'gemini');
+  UPDATE accounts SET last_sync_at = NULL WHERE platform = 'gemini';
+  `,
 ];

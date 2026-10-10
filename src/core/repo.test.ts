@@ -863,3 +863,28 @@ describe('migration 10', () => {
     ]);
   });
 });
+
+describe('migration 11', () => {
+  it('makes every Gemini chat be read once more, old ones too, and leaves the other platforms alone', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    for (let i = 0; i < 10; i++) db.exec(migrations[i] as string);
+    db.exec('PRAGMA user_version = 10');
+    db.exec(`
+      INSERT INTO accounts (id, platform, label, partition, last_sync_at) VALUES (1, 'gemini', 'G', 'persist:gemini-a', '2026-10-10T10:00:00.000Z'), (2, 'chatgpt', 'C', 'persist:x', '2026-10-10T10:00:00.000Z');
+      INSERT INTO conversations (id, account_id, remote_id, remote_title, title, parse_version, created_at, updated_at, remote_updated_at)
+        VALUES (1, 1, 'a', 't', 't', 0, 'x', 'x', '2025-01-01T00:00:00.000Z'), (2, 2, 'b', 't', 't', 2, 'x', 'x', '2025-01-01T00:00:00.000Z');
+    `);
+    migrate(db);
+    expect(db.prepare('SELECT id, remote_updated_at FROM conversations ORDER BY id').all()).toEqual(
+      [
+        { id: 1, remote_updated_at: '1970-01-01T00:00:00.000Z' },
+        { id: 2, remote_updated_at: '2025-01-01T00:00:00.000Z' },
+      ],
+    );
+    expect(db.prepare('SELECT id, last_sync_at FROM accounts ORDER BY id').all()).toEqual([
+      { id: 1, last_sync_at: null },
+      { id: 2, last_sync_at: '2026-10-10T10:00:00.000Z' },
+    ]);
+  });
+});
