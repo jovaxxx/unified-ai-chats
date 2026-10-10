@@ -214,12 +214,53 @@ export function describeQuery(searchParams: URLSearchParams): Record<string, str
 }
 
 const TUPLE_MAX = 60;
-const TUPLE_DEPTH = 12;
+const TUPLE_DEPTH = 24;
+const POSITIONAL_MAX_NODES = 60_000;
 const ID_LIKE = /^(?:[a-z]{1,3}_)?[A-Za-z0-9_-]{6,80}$/;
 
-/** A string that is not a known format: an identifier-like token keeps only its short prefix, free text only a size. */
+const MIME = /^(?:image|video|audio)\/[a-z0-9][a-z0-9.+-]{1,40}$/i;
+const KNOWN_HOST =
+  /(?:^|\.)(?:google\.com|googleusercontent\.com|gstatic\.com|googlevideo\.com|ggpht\.com|youtube\.com)$/;
+const MEDIA_EXT = /\.(mp4|webm|m3u8|mpd|mov|png|jpe?g|webp|gif|svg)$/i;
+/** The format hint Google puts at the end of a media link (`=s1024-rj`, `=m37`): never a token, never an id. */
+const LINK_TAIL = /=([a-z]{1,3}[0-9]{0,4}(?:-[a-z0-9]{1,4}){0,3})$/i;
+const FIXED_SEGMENT = /^[a-z][a-z-]{1,11}$/;
+
+/** A host reduced to its kind: a Google domain, with its subdomain only if that is a plain word (`lh3`, `contribution.usercontent`), never a server name. */
+function hostKind(host: string): string {
+  const suffix = KNOWN_HOST.exec(host)?.[0]?.replace(/^\./, '');
+  if (!suffix) return 'other-host';
+  const sub = host.slice(0, host.length - suffix.length).replace(/\.$/, '');
+  return sub && (/^[a-z]+(\.[a-z]+)*$/.test(sub) || /^[a-z]{1,4}\d$/.test(sub))
+    ? `${sub}.${suffix}`
+    : suffix;
+}
+
+/** A link reduced to its kind: which Google host, the first fixed path word, the file type and the format hint. */
+function describeLink(value: string): string {
+  try {
+    const u = new URL(value);
+    const host = hostKind(u.hostname.toLowerCase());
+    const first = u.pathname.split('/')[1] ?? '';
+    const parts = [
+      FIXED_SEGMENT.test(first) ? `${host}/${first}` : host,
+      MEDIA_EXT.exec(u.pathname)?.[0]?.toLowerCase(),
+      LINK_TAIL.exec(u.pathname)?.[0]?.toLowerCase(),
+    ].filter(Boolean);
+    return `string:url(${parts.join(' ')})`;
+  } catch {
+    return 'string:url';
+  }
+}
+
+/**
+ * A string that is not a known format: a media type (`video/mp4`) is kept, a link keeps only its kind, an
+ * identifier-like token keeps only its short prefix, free text only a size.
+ */
 function classifyPositionalString(value: string): string {
+  if (MIME.test(value)) return `string=${value.toLowerCase()}`;
   const known = classifyString(null, value);
+  if (known === 'string:url') return describeLink(value);
   if (known !== 'string') return known;
   if (ID_LIKE.test(value) && /\d/.test(value)) {
     const prefix = /^([a-z]{1,3}_)/.exec(value)?.[1];
@@ -238,7 +279,7 @@ function classifyPositionalString(value: string): string {
  * and a long list of similar items becomes `{ $list: … }`. Same rule as everywhere: types only, never a value.
  */
 export function positionalShapeOf(value: unknown, budget = { nodes: 0 }, depth = 0): Shape {
-  if (++budget.nodes > MAX_NODES) return '…truncated';
+  if (++budget.nodes > POSITIONAL_MAX_NODES) return '…truncated';
   if (value === null) return 'null';
   switch (typeof value) {
     case 'string':

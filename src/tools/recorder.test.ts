@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { StructureRecorder } from './recorder';
-import { describeQuery, mergeShapes, normalizePath, shapeOf } from './shape';
+import { describeQuery, mergeShapes, normalizePath, positionalShapeOf, shapeOf } from './shape';
 
 /** Strings that stand for things a real user would never want in a report. */
 const SECRETS = [
@@ -342,6 +342,36 @@ describe('StructureRecorder (Chrome DevTools Protocol events)', () => {
       'non-json:text/event-stream',
     );
     expect(has(r, 'hello')).toBe(false);
+  });
+});
+
+describe('positional shapes keep the kind of a link and a media type, never a value', () => {
+  it('says which host, which fixed path word, which file type and which format hint', () => {
+    const shape = JSON.stringify(
+      positionalShapeOf([
+        'https://lh3.googleusercontent.com/gg/AbCdEf1234567890xyzSECRET=s1024-rj',
+        'https://contribution.usercontent.google.com/download?c=SECRETTOKEN&filename=video.mp4',
+        'https://rr3---sn-abc.googlevideo.com/videoplayback/SECRET123.mp4',
+        'https://evil.example/Secret_Path/a.png',
+        'video/mp4',
+        'image/png',
+        'a plain sentence that is not a link or a type',
+      ]),
+    );
+    expect(shape).toContain('string:url(lh3.googleusercontent.com/gg =s1024-rj)');
+    expect(shape).toContain('string:url(contribution.usercontent.google.com/download)');
+    expect(shape).toContain('string:url(googlevideo.com .mp4)');
+    expect(shape).toContain('string:url(other-host .png)');
+    expect(shape).toContain('string=video/mp4');
+    expect(shape).toContain('string=image/png');
+    for (const secret of ['SECRET', 'AbCdEf', 'Secret_Path', 'plain sentence', 'sn-abc', 'rr3---'])
+      expect(shape).not.toContain(secret);
+  });
+
+  it('looks much deeper than before, so a nested media description is not cut off', () => {
+    let deep: unknown = ['https://lh3.googleusercontent.com/gg/x=m37'];
+    for (let i = 0; i < 20; i++) deep = [deep];
+    expect(JSON.stringify(positionalShapeOf(deep))).toContain('=m37');
   });
 });
 
