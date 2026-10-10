@@ -15,7 +15,8 @@ const HOME: Record<Platform, string> = {
 const CHAT_URL: Record<Platform, ((remoteId: string) => string) | null> = {
   chatgpt: (id) => `https://chatgpt.com/c/${encodeURIComponent(id)}`,
   claude: (id) => `https://claude.ai/chat/${encodeURIComponent(id)}`,
-  gemini: (id) => `https://gemini.google.com/app/${encodeURIComponent(id)}`,
+  // Gemini's own chat ids start with `c_`; its page address does not. NOT verified against a real chat.
+  gemini: (id) => `https://gemini.google.com/app/${encodeURIComponent(id.replace(/^c_/, ''))}`,
   'claude-code': null,
 };
 

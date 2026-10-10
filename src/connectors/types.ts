@@ -9,6 +9,17 @@ export interface HttpResult {
 /** Performs a GET on the platform's own site (path only, e.g. `/backend-api/me`) as the signed-in user. */
 export type HttpJson = (path: string) => Promise<HttpResult>;
 
+/**
+ * Google's batchexecute, for reading only: one call by method id, answered with the raw text (the connector reads it).
+ * The host adds the session's own tokens; they never reach the connector.
+ */
+export type BatchRpc = (call: {
+  rpcid: string;
+  args: unknown;
+  /** The page the call is made "from", as the site does (`/app` or `/app/<chat id>`). */
+  sourcePath: string;
+}) => Promise<{ status: number; text: string; retryAfterSeconds?: number }>;
+
 /** Fetches a file from an absolute https URL (e.g. a signed download link), as this profile's session. */
 export type DownloadUrl = (
   url: string,
@@ -34,6 +45,8 @@ export interface AccountContext {
   accountId: number;
   /** Web connectors only: performs requests as this profile's signed-in session. */
   http?: HttpJson;
+  /** Gemini only: performs batchexecute calls as this profile's signed-in session. */
+  rpc?: BatchRpc;
   /** Web connectors only: downloads a file from a URL the platform handed out. */
   downloadUrl?: DownloadUrl;
   /** Web connectors only: the platform's own account id this profile was created for, if known. */

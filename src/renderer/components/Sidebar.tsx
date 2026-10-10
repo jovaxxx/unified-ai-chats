@@ -82,7 +82,8 @@ export function Sidebar({
     data?.platforms.some(
       (p) =>
         p.platform === 'claude-code' ||
-        ((p.platform === 'chatgpt' || p.platform === 'claude') && !data.demo),
+        ((p.platform === 'chatgpt' || p.platform === 'claude' || p.platform === 'gemini') &&
+          !data.demo),
     ) ?? false;
 
   const toggle = (id: number) =>

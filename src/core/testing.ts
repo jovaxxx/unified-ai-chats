@@ -1,4 +1,4 @@
-import type { HttpJson, Connector, DownloadUrl } from '../connectors/types';
+import type { BatchRpc, HttpJson, Connector, DownloadUrl } from '../connectors/types';
 import type { SignInProbe, WebHost, WebTarget } from './api';
 import type { Platform, RecorderSaved, RecorderStatus } from '../shared/types';
 
@@ -14,6 +14,9 @@ export function fakeWeb() {
   let probeNeedsUser = false; // the platform never says who it is; only the user's own "I've signed in" counts
   let http: HttpJson = async () => {
     throw new Error('no fake http configured');
+  };
+  let rpcFn: BatchRpc = async () => {
+    throw new Error('no fake rpc configured');
   };
   let downloadUrlFn: DownloadUrl = async () => {
     throw new Error('no fake downloads configured');
@@ -44,6 +47,7 @@ export function fakeWeb() {
       httpPartitions.push(partition);
       return (path) => http(path);
     },
+    rpcFor: () => (call) => rpcFn(call),
     closeLogin: async (accountId) => void calls.push({ fn: 'closeLogin', accountId }),
     wipePartition: async (partition) => void wiped.push(partition),
     recorderStart: async (target) => {
@@ -75,6 +79,10 @@ export function fakeWeb() {
     partitionOf: (attemptId: string) => partitions.get(attemptId)!,
     setDownload: (fn: DownloadUrl) => {
       downloadUrlFn = fn;
+    },
+    /** The batchexecute calls a signed-in Gemini session makes. */
+    setRpc: (fn: BatchRpc) => {
+      rpcFn = fn;
     },
     /** The web API the signed-in sessions talk to. */
     setHttp: (fn: HttpJson) => {

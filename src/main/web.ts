@@ -3,9 +3,10 @@ import { join } from 'node:path';
 import { app, BrowserWindow, session, shell, type WebContents } from 'electron';
 import { randomUUID } from 'node:crypto';
 import type { SignInProbe, WebHost, WebTarget } from '../core/api';
-import type { DownloadUrl, HttpJson } from '../connectors/types';
+import type { BatchRpc, DownloadUrl, HttpJson } from '../connectors/types';
 import { createChatGptDownloader, createChatGptHttp } from './chatgptHttp';
 import { createClaudeHttp } from './claudeHttp';
+import { createGeminiRpc } from './geminiHttp';
 import { platformUrl } from '../core/platforms';
 import type { Platform, RecorderSaved, RecorderStatus } from '../shared/types';
 import { StructureRecorder } from '../tools/recorder';
@@ -220,7 +221,7 @@ export class ElectronWebHost implements WebHost {
     let h = this.http.get(partition);
     if (!h) {
       if (partition.startsWith('persist:gemini-'))
-        throw new Error('Reading Gemini is not built yet.'); // never send a Gemini session through another site's code
+        throw new Error('Gemini is read through rpcFor, not through this.'); // never send it through another site's code
       h = partition.startsWith('persist:claude-')
         ? createClaudeHttp(partition)
         : createChatGptHttp(partition);
@@ -229,12 +230,25 @@ export class ElectronWebHost implements WebHost {
     return h;
   }
 
+  private rpc = new Map<string, BatchRpc>();
+
+  rpcFor(partition: string): BatchRpc {
+    if (!partition.startsWith('persist:gemini-')) throw new Error('Only Gemini is read this way.');
+    let r = this.rpc.get(partition);
+    if (!r) {
+      r = createGeminiRpc(partition);
+      this.rpc.set(partition, r);
+    }
+    return r;
+  }
+
   downloadFor(partition: string): DownloadUrl {
     return createChatGptDownloader(partition);
   }
 
   async wipePartition(partition: string): Promise<void> {
     this.http.delete(partition);
+    this.rpc.delete(partition);
     const ses = session.fromPartition(partition);
     await ses.clearStorageData();
     await ses.clearCache();

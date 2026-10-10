@@ -1,10 +1,17 @@
 import { z } from 'zod';
 import { createChatGptConnector } from '../connectors/chatgpt';
 import { createClaudeConnector } from '../connectors/claude';
+import { createGeminiConnector } from '../connectors/gemini';
 import { MAX_PROFILES_PER_PLATFORM, ONE_PER_PLATFORM_MESSAGE } from '../shared/limits';
 import type { ClientOptions } from '../connectors/chatgpt/client';
 import { claudeCodeConnector } from '../connectors/claude-code';
-import type { AccountContext, Connector, DownloadUrl, HttpJson } from '../connectors/types';
+import type {
+  AccountContext,
+  BatchRpc,
+  Connector,
+  DownloadUrl,
+  HttpJson,
+} from '../connectors/types';
 import type { Api } from '../shared/api';
 import {
   accountLabelSchema,
@@ -67,6 +74,8 @@ export interface WebHost {
   downloadFor(partition: string): DownloadUrl;
   /** Requests made as this session's signed-in user. The access token never leaves the host. */
   httpFor(partition: string): HttpJson;
+  /** Gemini only: batchexecute calls made as this session's signed-in user (reading only). */
+  rpcFor(partition: string): BatchRpc;
   /** Deletes everything a browser session stored (cookies, storage, cache). */
   wipePartition(partition: string): Promise<void>;
   recorderStart(target: WebTarget): Promise<void>;
@@ -133,6 +142,7 @@ export function createApi(
   const waiting = new Map<number, number>();
   const claudeConnector = createClaudeConnector(deps.chatgptClient);
   const chatgptConnector = createChatGptConnector(deps.chatgptClient);
+  const geminiConnector = createGeminiConnector(deps.chatgptClient);
   const running = new Map<number, Promise<SyncStats>>();
   let recentRuns = 0;
   /** Runs one profile's sync; asking again while it runs gives the same run instead of starting a second. */
@@ -158,14 +168,28 @@ export function createApi(
     opts: { includeProjects?: boolean } = {},
   ): Promise<SyncStats> => {
     const acc = repo.getAccount(accountId);
-    if (!acc || (acc.platform !== 'chatgpt' && acc.platform !== 'claude'))
+    if (
+      !acc ||
+      (acc.platform !== 'chatgpt' && acc.platform !== 'claude' && acc.platform !== 'gemini')
+    )
       throw new Error('This profile is not a web profile.');
-    const connector = acc.platform === 'claude' ? claudeConnector : chatgptConnector;
+    const connector =
+      acc.platform === 'claude'
+        ? claudeConnector
+        : acc.platform === 'gemini'
+          ? geminiConnector
+          : chatgptConnector;
     if (!deps.web) throw new Error('Signing in is not available here.');
+    const session =
+      acc.platform === 'gemini'
+        ? { rpc: deps.web.rpcFor(acc.partition) }
+        : {
+            http: deps.web.httpFor(acc.partition),
+            downloadUrl: deps.web.downloadFor(acc.partition),
+          };
     const ctx = {
       accountId,
-      http: deps.web.httpFor(acc.partition),
-      downloadUrl: deps.web.downloadFor(acc.partition),
+      ...session,
       expectedIdentity: acc.identity,
       ...(opts.includeProjects === false ? { includeProjects: false } : {}),
       onWait: (ms: number) => {
@@ -194,7 +218,11 @@ export function createApi(
   const syncableIds = (): number[] => [
     ...repo.accountsOf('claude-code').map((a) => a.id),
     ...(deps.web
-      ? [...repo.profilesOf('chatgpt'), ...repo.profilesOf('claude')].map((a) => a.id)
+      ? [
+          ...repo.profilesOf('chatgpt'),
+          ...repo.profilesOf('claude'),
+          ...repo.profilesOf('gemini'),
+        ].map((a) => a.id)
       : []),
   ];
 
