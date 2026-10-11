@@ -2,7 +2,7 @@
 
 An open-source desktop app that works like an email client for your AI chats.
 
-Connect your ChatGPT and Claude accounts and the Claude Code sessions on your Mac, and get one local inbox with everything organized the way it is on each platform: chats, projects, archive, generated images. Search, tag, archive and sort everything in one place.
+Connect your ChatGPT, Claude and Gemini accounts and the Claude Code sessions on your Mac, and get one local inbox with everything organized the way it is on each platform: chats, projects, archive, generated images and videos. Search, tag, archive and sort everything in one place.
 
 ![Screenshot of the inbox (synthetic data, taken from an early version)](docs/screenshot.png)
 
@@ -50,15 +50,16 @@ Everything (database, image previews, sign-in sessions) lives in your user folde
 
 ## What it does
 
-Latest release: **v0.1.2**. macOS (Apple Silicon and Intel) is tested; the Windows and Linux installers are built by CI and are **untested**.
+Latest release: **v0.1.5**. macOS (Apple Silicon and Intel) is tested; the Windows and Linux installers are built by CI and are **untested**.
 
-- **Accounts:** ChatGPT and Claude through a sign-in window (one isolated session per profile; the app never sees your password), and Claude Code sessions read from `~/.claude/projects` (no login, no network). Profiles have free-text names, several per platform; an account that is already connected is recognised, so no duplicate is created.
+- **Accounts:** ChatGPT, Claude and Gemini through a sign-in window (one isolated session per profile; the app never sees your password), and Claude Code sessions read from `~/.claude/projects` (no login, no network). One profile per platform, with a free-text name; an account that is already connected is recognised, so no duplicate is created.
 - **First run:** a new install starts empty. The first sync of a new account starts by itself, and recent chats are refreshed in the background every few minutes and when the window comes back into focus.
 - **Sync:** incremental, newest first, resumable, one independent sync per profile, with a progress line and a note when the platform asks it to slow down.
-- **Organize:** chats, projects, archive and pinned chats as on each platform; tags; local rename; a Trash with a 14-day countdown; bulk select with archive, trash, restore and tag; eight sort orders; profiles and platforms in the order you choose; resizable columns; English and Italian; dark mode.
+- **Organize:** chats, projects, archive and pinned chats as on each platform, and the chats ChatGPT keeps apart as "Work", in a WORK folder beside Chats and Projects; tags; local rename; a Trash with a 14-day countdown; bulk select with archive, trash, restore and tag; eight sort orders; profiles and platforms in the order you choose; resizable columns; English and Italian; dark mode.
 - **Search:** full-text search (SQLite FTS5) inside a profile or everywhere.
 - **Reader:** assistant messages in Markdown as on the platform, the active branch of each conversation, an "Open on platform" button, and a copyable resume command for Claude Code.
-- **Images:** generated ChatGPT images are shown from ChatGPT's own link, not downloaded: small cached previews, a gallery per profile and overall with search, project filter and date sort, and a Save image button for one image at a time.
+- **Images and videos:** generated ChatGPT and Gemini images, and Gemini's generated videos, are shown from the platform's own link, not downloaded ahead of time: small cached previews, a Media folder per profile and overall with search, project filter, date sort and an Images / Videos filter, a player for videos, and a Save button for one file at a time.
+- **Deleted on the platform:** when you press Sync, chats that no longer exist on the platform (each one confirmed by asking for it) are moved to the app's Trash, where they wait the usual 14 days.
 - **Dashboard:** per platform and per profile: counts, chats per month, "to clean" suggestions, latest images.
 - **Read-only:** the app only reads from the platforms; archive, rename, tag and delete change your local copy only.
 - **Local-first:** no telemetry; data stays on your device, in your user folder.

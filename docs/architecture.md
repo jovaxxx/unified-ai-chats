@@ -9,7 +9,7 @@ src/main        Electron main process: window, sign-in windows, IPC, media proto
 src/preload     Exposes exactly the `Api` methods to the renderer through contextBridge.
 src/renderer    React UI. Sandboxed, contextIsolation on, no Node access.
 src/core        Database, migrations, repository, sync engine, action queue, validated API. No Electron imports.
-src/connectors  One folder per source (claude-code, chatgpt, claude), the shared Connector interface and errors.
+src/connectors  One folder per source (claude-code, chatgpt, claude, gemini), the shared Connector interface and errors.
 src/shared      Types, zod schemas and the `Api` / IPC contract used by both sides.
 src/tools       The structure recorder.
 ```
@@ -49,7 +49,7 @@ Every bulk action returns the ids it actually changed, so **Undo** only reverts 
 
 ## Connectors
 
-Every connector validates every response with zod; a response that no longer matches raises `EndpointChanged`, the profile is marked "needs attention" and the sync stops instead of guessing. Other errors: `SessionExpired`, `RateLimited`, `NotFound`. Requests are sequential, paced with jitter, with growing back-off on 429/5xx. Connectors share one interface (`src/connectors/types.ts`). The three shipped today are read-only.
+Every connector validates every response with zod; a response that no longer matches raises `EndpointChanged`, the profile is marked "needs attention" and the sync stops instead of guessing. Other errors: `SessionExpired`, `RateLimited`, `NotFound`. Requests are sequential, paced with jitter, with growing back-off on 429/5xx. Connectors share one interface (`src/connectors/types.ts`). The four shipped today are read-only.
 
 ### Claude Code sessions
 
@@ -80,6 +80,16 @@ Built from a structure report recorded on a real account.
 - The active branch is kept (from `current_leaf_message_uuid` up through `parent_message_uuid`). Text is kept; thinking, tool calls and results, files and attachments are counted in the sync report, not shown.
 - **Assumptions:** `GET /api/organizations` (organization ids) and `GET /api/account` (account id) were not in the report and come from calls unofficial clients are known to use; whether `starred=true` lists starred chats; whether the session cookie alone is enough.
 
+### ChatGPT work chats
+
+The site lists "work" chats apart (`GET /backend-api/conversations?conversation_origin=tpp`); the ordinary list leaves them out. They are listed whole on every run and read through `GET /backend-api/conversations/<id>?num_turns=100`, and are filed in a folder named WORK (a main-level entry of the profile, not one of its projects). A chat already stored is filed in it without being read again.
+
+### Gemini
+
+Read-only, from a structure report recorded on a real account. Gemini has no JSON API: the connector calls Google's `batchexecute` endpoint through the profile's own session (`src/main/geminiHttp.ts`; the page tokens stay in the main process) with two method ids, one that lists chats and one that reads a chat. Answers are positional arrays, so the connector finds chats and turns by the shape of the data, never by fixed positions, and validates what it takes. Generated images are only fetched from `googleusercontent.com`; generated videos only from `contribution.usercontent.google.com/download`.
+
+- **Assumptions:** the method ids and the layout of the arrays were observed on one account and can change without notice; a change raises `EndpointChanged` like the other connectors.
+
 ## Sign-in windows and the structure recorder
 
 Each profile has its own persistent partition (`persist:<platform>-<id>`), so its sign-in stays separate from everything else. The account id is read from the platform's own page from inside its window; only the id and a display name leave the page, never the token.
@@ -95,9 +105,9 @@ The **structure recorder** (opt-in, per profile, only while "Start recording" is
 - **Background refresh.** Every 3 minutes and when the window comes back into focus after more than a minute, the app quietly refreshes recent chats (`syncRecent`), with a small "N chats updated" note when something changed. It walks every project's list only every fifth refresh.
 - **Reports** carry counts only (chats seen, imported, failed, kinds skipped, listing numbers), never content.
 
-## Images (ChatGPT)
+## Images and videos
 
-Images are **not downloaded**. When an image is looked at, the app asks ChatGPT for a fresh signed link and fetches it with that profile's session (one request at a time, spaced out); the bytes stay in memory (up to 80 images / 120 MB) and are served to the window through `uac-media://m/<id>`, only for image types and only by database id. Only `https` links on `chatgpt.com`, `oaiusercontent.com` and `openaiusercontent.com` are followed.
+Images and videos are **not downloaded ahead of time**. When an image is looked at, the app asks ChatGPT for a fresh signed link and fetches it with that profile's session (one request at a time, spaced out); the bytes stay in memory (up to 80 images / 120 MB) and are served to the window through `uac-media://m/<id>`, only for image types and only by database id. Only `https` links on `chatgpt.com`, `oaiusercontent.com` and `openaiusercontent.com` are followed for ChatGPT, and on `googleusercontent.com` (images) and `contribution.usercontent.google.com/download` (videos) for Gemini. A video is played from the same in-memory copy, with range requests so it can be skipped through.
 
 - **Previews:** the chat, the gallery and the dashboard show a small JPEG (240 px on the long side, a few KB) served as `uac-media://t/<id>` and kept in `<userData>/thumbs/<id>.jpg`, so an image is fetched once. They are removed when the chat is deleted for good.
 - **Save image…** writes one image where the user chooses.
